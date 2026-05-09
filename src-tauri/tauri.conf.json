@@ -38,9 +38,18 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/icon.png",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEExRDk5RUJFQTMyMkI3MEEKUldRS3R5S2p2cDdab1hqWWpvSkxCRFBwa0hEc2dOOEh2MTFtZUt6ZGpzSjZEMTJreFVYYWdzNHcK",
+      "endpoints": [
+        "https://github.com/fangbm/CodexPetDesk/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

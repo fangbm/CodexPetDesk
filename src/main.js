@@ -196,6 +196,7 @@ async function initializeTauriRuntime() {
     await currentWindow.onMoved(({ payload }) => {
       handleWindowMoved(payload.x);
     });
+    checkForUpdates();
   }
 
   await loadInstalledPets(tauri.invoke);
@@ -243,6 +244,21 @@ async function getTauriApi() {
     return { invoke, listen, emit, currentWindow: getCurrentWindow(), LogicalSize: TauriLogicalSize };
   } catch {
     return null;
+  }
+}
+
+async function checkForUpdates() {
+  try {
+    const [{ check }, { relaunch }] = await Promise.all([
+      import("@tauri-apps/plugin-updater"),
+      import("@tauri-apps/plugin-process")
+    ]);
+    const update = await check();
+    if (!update) return;
+    await update.downloadAndInstall();
+    await relaunch();
+  } catch (error) {
+    console.info("Update check skipped:", error);
   }
 }
 
