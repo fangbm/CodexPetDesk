@@ -13,9 +13,23 @@ permissions:
   contents: write
 
 jobs:
+  validate-release-secrets:
+    name: Validate release secrets
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check updater signing secret
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "::error::Missing TAURI_SIGNING_PRIVATE_KEY repository secret. Set it from the generated local .tauri-keys/updater.key file."
+            exit 1
+          fi
+
   build:
     name: Build ${{ matrix.platform.name }}
     runs-on: ${{ matrix.platform.runner }}
+    needs: validate-release-secrets
 
     strategy:
       fail-fast: false
@@ -81,16 +95,6 @@ jobs:
           console.log(`RELEASE_VERSION=${version}`);
           fs.appendFileSync(process.env.GITHUB_ENV, `RELEASE_VERSION=${version}\n`);
           NODE
-
-      - name: Check updater signing secret
-        shell: bash
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-        run: |
-          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
-            echo "::error::Missing TAURI_SIGNING_PRIVATE_KEY repository secret. Set it from the generated local .tauri-keys/updater.key file."
-            exit 1
-          fi
 
       - name: Build and publish release
         uses: tauri-apps/tauri-action@v0
