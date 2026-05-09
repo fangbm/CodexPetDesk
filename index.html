@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Codex Pet Desk</title>
+  </head>
+  <body>
+    <main id="app" class="shell shell--pet" data-tauri-drag-region>
+      <section class="pet-stage" data-tauri-drag-region>
+        <div id="pet" class="pet" data-tauri-drag-region aria-label="Codex pet"></div>
+      </section>
+
+      <section id="panel" class="panel">
+        <div class="pet-meta">
+          <strong>Codex Pet Desk</strong>
+          <span id="pet-description">Choose an installed Codex pet or load a pet package.</span>
+        </div>
+
+        <label id="native-pets" class="native-pets is-hidden">
+          <span>Pet</span>
+          <select id="native-pet-select">
+            <option value="">No installed pets found</option>
+          </select>
+        </label>
+
+        <label class="scale-control">
+          <span>Size</span>
+          <input id="scale" type="range" min="0.6" max="2" step="0.05" value="1" />
+        </label>
+
+        <div class="controls" aria-label="Pet animation state">
+          <button class="state-button is-active" data-state="idle" type="button">Idle</button>
+          <button class="state-button" data-state="waiting" type="button">Wait</button>
+          <button class="state-button" data-state="running" type="button">Work</button>
+          <button class="state-button" data-state="review" type="button">Review</button>
+          <button class="state-button" data-state="waving" type="button">Wave</button>
+          <button class="state-button" data-state="jumping" type="button">Jump</button>
+          <button class="state-button" data-state="failed" type="button">Fail</button>
+        </div>
+
+        <div class="file-actions">
+          <label class="file-button">
+            Open pet
+            <input id="file-input" type="file" accept=".json,.webp,.png" multiple />
+          </label>
+          <label class="file-button">
+            Open folder
+            <input id="folder-input" type="file" webkitdirectory multiple />
+          </label>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
