@@ -9,14 +9,26 @@ on:
 
 jobs:
   check:
-    name: Frontend and Rust checks
-    runs-on: ubuntu-22.04
+    name: Check ${{ matrix.platform.name }}
+    runs-on: ${{ matrix.platform.runner }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - name: windows-x64
+            runner: windows-latest
+          - name: macos-arm64
+            runner: macos-latest
+          - name: linux-x64
+            runner: ubuntu-22.04
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Install Linux Tauri dependencies
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
