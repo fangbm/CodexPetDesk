@@ -6,6 +6,8 @@ const COLUMNS = 8;
 const ROWS = 9;
 const PET_WINDOW_PADDING = 16;
 const BUBBLE_WINDOW_WIDTH = 276;
+const BUBBLE_STAGE_TOP_PADDING = 76;
+const BUBBLE_STAGE_BOTTOM_PADDING = 4;
 const MIN_SCALE = 0.6;
 const MAX_SCALE = 2;
 const WHEEL_SCALE_STEP = 0.08;
@@ -81,6 +83,7 @@ let lastTimestamp = 0;
 let loadedObjectUrl = "";
 let currentWindow = null;
 let LogicalSize = null;
+let PhysicalPosition = null;
 let emitEvent = null;
 let invokeCommand = null;
 let openDialog = null;
@@ -94,6 +97,8 @@ let petStorageDir = localStorage.getItem(PET_STORAGE_DIR_KEY) || "";
 let petdexPets = [];
 let speechBubbleTimer = 0;
 let hookPollTimer = 0;
+let lastPetWindowLayout = null;
+let windowLayoutMoveTimer = 0;
 
 appEl.classList.toggle("shell--settings", isSettingsWindow);
 appEl.classList.toggle("shell--pet", !isSettingsWindow);
@@ -257,6 +262,7 @@ async function initializeTauriRuntime() {
 
   currentWindow = tauri.currentWindow;
   LogicalSize = tauri.LogicalSize;
+  PhysicalPosition = tauri.PhysicalPosition;
   emitEvent = tauri.emit;
   invokeCommand = tauri.invoke;
   openDialog = tauri.openDialog;
@@ -293,6 +299,10 @@ async function initializeTauriRuntime() {
 
   if (!isSettingsWindow) {
     await currentWindow.onMoved(({ payload }) => {
+      if (windowLayoutMoveTimer) {
+        lastWindowX = payload.x;
+        return;
+      }
       handleWindowMoved(payload.x);
     });
     if (shouldCheckUpdatesOnStartup()) checkForUpdates();
@@ -351,14 +361,24 @@ function loadNativePet(pet) {
 async function getTauriApi() {
   if (!("__TAURI_INTERNALS__" in window)) return null;
   try {
-    const [{ invoke }, { listen, emit }, { getCurrentWindow, LogicalSize: TauriLogicalSize }, { getVersion }, { open: openDialog, ask }] = await Promise.all([
+    const [{ invoke }, { listen, emit }, { getCurrentWindow, LogicalSize: TauriLogicalSize, PhysicalPosition: TauriPhysicalPosition }, { getVersion }, { open: openDialog, ask }] = await Promise.all([
       import("@tauri-apps/api/core"),
       import("@tauri-apps/api/event"),
       import("@tauri-apps/api/window"),
       import("@tauri-apps/api/app"),
       import("@tauri-apps/plugin-dialog")
     ]);
-    return { invoke, listen, emit, getVersion, openDialog, askDialog: ask, currentWindow: getCurrentWindow(), LogicalSize: TauriLogicalSize };
+    return {
+      invoke,
+      listen,
+      emit,
+      getVersion,
+      openDialog,
+      askDialog: ask,
+      currentWindow: getCurrentWindow(),
+      LogicalSize: TauriLogicalSize,
+      PhysicalPosition: TauriPhysicalPosition
+    };
   } catch {
     return null;
   }
@@ -894,12 +914,55 @@ function updateScale(nextScale, broadcast = true) {
 }
 
 function resizePetWindow() {
+  void resizePetWindowToLayout();
+}
+
+async function resizePetWindowToLayout() {
   if (isSettingsWindow || !currentWindow || !LogicalSize) return;
-  const bubbleHeight = appEl.classList.contains("has-bubble") ? 82 : 0;
-  const petWidth = CELL_WIDTH * scale + PET_WINDOW_PADDING;
-  const width = Math.ceil(appEl.classList.contains("has-bubble") ? Math.max(petWidth, BUBBLE_WINDOW_WIDTH) : petWidth);
-  const height = Math.ceil(CELL_HEIGHT * scale + PET_WINDOW_PADDING + bubbleHeight);
-  currentWindow.setSize(new LogicalSize(width, height));
+
+  const nextLayout = getPetWindowLayout(appEl.classList.contains("has-bubble"));
+  const previousLayout = lastPetWindowLayout;
+  lastPetWindowLayout = nextLayout;
+
+  if (!previousLayout || !PhysicalPosition) {
+    await currentWindow.setSize(new LogicalSize(nextLayout.width, nextLayout.height));
+    return;
+  }
+
+  try {
+    const [position, scaleFactor] = await Promise.all([
+      currentWindow.outerPosition(),
+      currentWindow.scaleFactor?.() ?? Promise.resolve(1)
+    ]);
+    const factor = Number.isFinite(scaleFactor) && scaleFactor > 0 ? scaleFactor : 1;
+    const nextX = Math.round(position.x + (previousLayout.petOffsetX - nextLayout.petOffsetX) * factor);
+    const nextY = Math.round(position.y + (previousLayout.petOffsetY - nextLayout.petOffsetY) * factor);
+
+    window.clearTimeout(windowLayoutMoveTimer);
+    windowLayoutMoveTimer = window.setTimeout(() => {
+      windowLayoutMoveTimer = 0;
+    }, 120);
+
+    await currentWindow.setSize(new LogicalSize(nextLayout.width, nextLayout.height));
+    await currentWindow.setPosition(new PhysicalPosition(nextX, nextY));
+  } catch (error) {
+    console.info("Pet window resize skipped:", error);
+    await currentWindow.setSize(new LogicalSize(nextLayout.width, nextLayout.height));
+  }
+}
+
+function getPetWindowLayout(hasBubble) {
+  const petWidth = CELL_WIDTH * scale;
+  const petHeight = CELL_HEIGHT * scale;
+  const baseWidth = petWidth + PET_WINDOW_PADDING;
+  const width = Math.ceil(hasBubble ? Math.max(baseWidth, BUBBLE_WINDOW_WIDTH) : baseWidth);
+  const height = Math.ceil(petHeight + PET_WINDOW_PADDING + (hasBubble ? 82 : 0));
+  const petOffsetX = (width - petWidth) / 2;
+  const petOffsetY = hasBubble
+    ? BUBBLE_STAGE_TOP_PADDING + ((height - BUBBLE_STAGE_TOP_PADDING - BUBBLE_STAGE_BOTTOM_PADDING - petHeight) / 2)
+    : (height - petHeight) / 2;
+
+  return { width, height, petOffsetX, petOffsetY };
 }
 
 function readFileAsDataUrl(file) {
