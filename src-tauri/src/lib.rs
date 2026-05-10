@@ -484,9 +484,9 @@ fn open_or_focus_control_window(
 
     WebviewWindowBuilder::new(app_handle, label, WebviewUrl::App(url.into()))
         .title(title)
-        .inner_size(640.0, 480.0)
-        .min_inner_size(640.0, 480.0)
-        .resizable(false)
+        .inner_size(720.0, 480.0)
+        .min_inner_size(520.0, 360.0)
+        .resizable(true)
         .decorations(true)
         .skip_taskbar(true)
         .focused(true)

@@ -241,6 +241,11 @@ input {
   display: grid;
 }
 
+.settings-page[data-page="pets"].is-active {
+  grid-template-rows: auto auto minmax(0, 1fr);
+  min-height: 0;
+}
+
 .settings-page[data-page="settings"].is-active {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
@@ -253,6 +258,36 @@ input {
 .settings-page[data-page="settings"] .settings-section:first-child,
 .settings-page[data-page="settings"] .settings-section:last-child {
   grid-column: 1 / -1;
+}
+
+.pet-tabs {
+  position: sticky;
+  top: 38px;
+  z-index: 1;
+}
+
+.pet-page {
+  display: none;
+  min-height: 0;
+}
+
+.pet-page.is-active {
+  display: grid;
+  gap: 10px;
+}
+
+.petdex-searchbar {
+  position: sticky;
+  top: 38px;
+  z-index: 2;
+  grid-template-columns: minmax(0, 1fr) 164px;
+  align-items: center;
+  background: rgb(29 35 37 / 0.94);
+  backdrop-filter: blur(16px);
+}
+
+.petdex-searchbar .file-actions {
+  grid-template-columns: 1fr 1fr;
 }
 
 .section-title {
@@ -418,6 +453,7 @@ input {
 .pet-list {
   display: grid;
   gap: 8px;
+  min-height: 0;
 }
 
 .pet-card {
@@ -503,12 +539,52 @@ body.is-dragging .panel {
   border-color: rgb(65 198 158 / 0.8);
 }
 
-@media (max-width: 360px) {
+@media (max-width: 640px) {
+  .shell--settings {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 148px minmax(0, 1fr);
+  }
+
+  .shell--settings .panel {
+    min-height: 0;
+  }
+
+  .settings-page[data-page="settings"].is-active {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-page[data-page="settings"] .settings-section:first-child,
+  .settings-page[data-page="settings"] .settings-section:last-child {
+    grid-column: auto;
+  }
+
+  .petdex-searchbar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 420px) {
   .controls {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
-  .shell {
-    padding: 8px;
+  .file-actions,
+  .petdex-searchbar .file-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pet-card {
+    grid-template-columns: 46px minmax(0, 1fr);
+  }
+
+  .pet-card-action {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .pet-card-thumb {
+    width: 46px;
+    height: 46px;
+    background-size: 368px 399px;
   }
 }

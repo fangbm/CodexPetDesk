@@ -61,8 +61,10 @@ const petdexListEl = document.querySelector("#petdex-list");
 const refreshPetdexEl = document.querySelector("#refresh-petdex");
 const openPetdexEl = document.querySelector("#open-petdex");
 const stateButtons = [...document.querySelectorAll(".state-button")];
-const tabButtons = [...document.querySelectorAll(".tab-button")];
+const tabButtons = [...document.querySelectorAll("[data-page].tab-button")];
 const pageEls = [...document.querySelectorAll(".settings-page")];
+const petPageButtons = [...document.querySelectorAll("[data-pet-page].tab-button")];
+const petPageEls = [...document.querySelectorAll(".pet-page")];
 
 let currentPet = SAMPLE_PET;
 let installedPets = [];
@@ -143,6 +145,10 @@ petdexSearchEl.addEventListener("input", renderPetdexPets);
 
 tabButtons.forEach((button) => {
   button.addEventListener("click", () => setSettingsPage(button.dataset.page));
+});
+
+petPageButtons.forEach((button) => {
+  button.addEventListener("click", () => setPetManagementPage(button.dataset.petPage));
 });
 
 petEl.addEventListener("click", () => {
@@ -336,6 +342,12 @@ function setSettingsPage(page) {
   if (page === "pets") loadPetdexPets();
 }
 
+function setPetManagementPage(page) {
+  petPageButtons.forEach((button) => button.classList.toggle("is-active", button.dataset.petPage === page));
+  petPageEls.forEach((pageEl) => pageEl.classList.toggle("is-active", pageEl.dataset.petPage === page));
+  if (page === "petdex") loadPetdexPets();
+}
+
 function renderPetStorageDir() {
   petStoragePathEl.value = petStorageDir || defaultPetStorageDir || "";
 }
@@ -444,6 +456,7 @@ async function installPetdexPet(slug) {
     await loadInstalledPets(invokeCommand);
     loadNativePet(installed);
     setSettingsPage("pets");
+    setPetManagementPage("local");
   } catch (error) {
     setPetdexStatus(`Install failed: ${error}`);
   } finally {
