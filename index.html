@@ -6,20 +6,7 @@
     <title>Codex Pet Desk</title>
   </head>
   <body>
-    <script>
-      if (new URLSearchParams(window.location.search).has("settings")) {
-        document.documentElement.classList.add("settings-boot");
-      }
-    </script>
     <main id="app" class="shell shell--pet" data-tauri-drag-region>
-      <script>
-        if (new URLSearchParams(window.location.search).has("settings")) {
-          const app = document.currentScript.parentElement;
-          app.classList.add("shell--settings");
-          app.classList.remove("shell--pet");
-          app.removeAttribute("data-tauri-drag-region");
-        }
-      </script>
       <section class="pet-stage" data-tauri-drag-region>
         <div id="speech-bubble" class="speech-bubble" aria-live="polite"></div>
         <div id="pet" class="pet" data-tauri-drag-region aria-label="Codex pet"></div>

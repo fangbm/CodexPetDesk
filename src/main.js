@@ -105,11 +105,10 @@ let lastCodexActivityKey = "";
 
 appEl.classList.toggle("shell--settings", isSettingsWindow);
 appEl.classList.toggle("shell--pet", !isSettingsWindow);
-if (isSettingsWindow) appEl.removeAttribute("data-tauri-drag-region");
 setSettingsPage(initialSettingsPage);
 applyScale();
 setState("idle");
-if (!isSettingsWindow) requestAnimationFrame(tick);
+requestAnimationFrame(tick);
 initializeTauriRuntime();
 initializeUpdateSettings();
 
@@ -298,10 +297,8 @@ async function initializeTauriRuntime() {
   defaultPetStorageDir = await tauri.invoke("default_pet_storage_dir");
   if (!petStorageDir) petStorageDir = defaultPetStorageDir;
   renderPetStorageDir();
-  if (!isSettingsWindow) {
-    await loadBuiltinDefaultPet(tauri.invoke);
-    resizePetWindow();
-  }
+  await loadBuiltinDefaultPet(tauri.invoke);
+  resizePetWindow();
 
   await tauri.listen("active-pet-changed", (event) => {
     if (!event.payload) return;
@@ -969,7 +966,6 @@ function setState(state, broadcast = true) {
 }
 
 function tick(timestamp) {
-  if (isSettingsWindow) return;
   const elapsed = lastTimestamp ? timestamp - lastTimestamp : 0;
   lastTimestamp = timestamp;
 
