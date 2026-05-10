@@ -15,14 +15,69 @@ permissions:
   contents: write
 
 jobs:
+  version-change:
+    name: Detect version change
+    runs-on: ubuntu-22.04
+    outputs:
+      changed: ${{ steps.detect.outputs.changed }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+          fetch-depth: 0
+
+      - name: Check version fields
+        id: detect
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const cp = require("node:child_process");
+
+          if (process.env.GITHUB_EVENT_NAME !== "workflow_run") {
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, "changed=true\n");
+            console.log("Manual and tag builds are allowed.");
+            process.exit(0);
+          }
+
+          const head = cp.execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+          const parent = cp.execFileSync("git", ["rev-parse", "HEAD^"], { encoding: "utf8" }).trim();
+
+          function fileAt(ref, file) {
+            try {
+              return cp.execFileSync("git", ["show", `${ref}:${file}`], { encoding: "utf8" });
+            } catch {
+              return "";
+            }
+          }
+
+          function versionAt(ref, file) {
+            const content = ref === "WORKTREE"
+              ? fs.readFileSync(file, "utf8")
+              : fileAt(ref, file);
+            if (!content) return "";
+            return JSON.parse(content).version || "";
+          }
+
+          const files = ["package.json", "src-tauri/tauri.conf.json"];
+          const changed = files.some((file) => versionAt(parent, file) !== versionAt("WORKTREE", file));
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `changed=${changed}\n`);
+          console.log(`Version changed between ${parent} and ${head}: ${changed}`);
+          NODE
+
   validate-release-secrets:
     name: Validate release secrets
+    needs: version-change
     if: >
-      github.event_name != 'workflow_run' ||
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'push' ||
       (
         github.event.workflow_run.conclusion == 'success' &&
         github.event.workflow_run.event == 'push' &&
-        (github.event.workflow_run.head_branch == 'main' || github.event.workflow_run.head_branch == 'master')
+        (github.event.workflow_run.head_branch == 'main' || github.event.workflow_run.head_branch == 'master') &&
+        needs.version-change.outputs.changed == 'true'
       )
     runs-on: ubuntu-22.04
     steps:
