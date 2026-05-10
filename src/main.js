@@ -6,6 +6,7 @@ const COLUMNS = 8;
 const ROWS = 9;
 const PET_WINDOW_PADDING = 16;
 const BUBBLE_WINDOW_WIDTH = 276;
+const BUBBLE_WINDOW_HEIGHT = 82;
 const MIN_SCALE = 0.6;
 const MAX_SCALE = 2;
 const WHEEL_SCALE_STEP = 0.08;
@@ -97,7 +98,6 @@ let speechBubbleTimer = 0;
 let hookPollTimer = 0;
 let windowLayoutMoveTimer = 0;
 let currentPetWindowLayout = null;
-let speechBubbleRequestId = 0;
 let lastCodexActivityKey = "";
 
 appEl.classList.toggle("shell--settings", isSettingsWindow);
@@ -720,18 +720,15 @@ function formatHookAgent(agent) {
 }
 
 function showSpeechBubble(options = {}) {
-  void showSpeechBubbleAsync(options);
+  showSpeechBubbleContent(options);
 }
 
-async function showSpeechBubbleAsync({ title = "", message = "", state = "waving", timeout = 8500 } = {}) {
+function showSpeechBubbleContent({ title = "", message = "", state = "waving", timeout = 8500 } = {}) {
   if (isSettingsWindow || !speechBubbleEl) return;
-  const requestId = ++speechBubbleRequestId;
   speechBubbleEl.innerHTML = `
     <strong>${escapeText(title)}</strong>
     <span>${escapeText(message)}</span>
   `;
-  await resizePetWindowToLayout({ keepPetAnchored: true, hasBubble: true });
-  if (requestId !== speechBubbleRequestId) return;
   appEl.classList.add("has-bubble");
   setState(state);
   window.clearTimeout(speechBubbleTimer);
@@ -739,16 +736,9 @@ async function showSpeechBubbleAsync({ title = "", message = "", state = "waving
 }
 
 function hideSpeechBubble() {
-  void hideSpeechBubbleAsync();
-}
-
-async function hideSpeechBubbleAsync() {
-  const requestId = ++speechBubbleRequestId;
   appEl.classList.remove("has-bubble");
   if (speechBubbleEl) speechBubbleEl.textContent = "";
   if (!isPetHovered) setState("idle");
-  await resizePetWindowToLayout({ keepPetAnchored: true, hasBubble: false });
-  if (requestId !== speechBubbleRequestId) return;
 }
 
 async function checkForUpdates({ manual = false } = {}) {
@@ -961,11 +951,11 @@ function resizePetWindow(options = {}) {
   void resizePetWindowToLayout({ keepPetAnchored: true, ...options });
 }
 
-async function resizePetWindowToLayout({ keepPetAnchored = false, hasBubble = null } = {}) {
+async function resizePetWindowToLayout({ keepPetAnchored = false } = {}) {
   if (isSettingsWindow || !currentWindow || !LogicalSize) return;
 
-  const nextLayout = getPetWindowLayout(hasBubble ?? appEl.classList.contains("has-bubble"));
-  const previousLayout = currentPetWindowLayout ?? (keepPetAnchored ? getPetWindowLayout(false) : null);
+  const nextLayout = getPetWindowLayout();
+  const previousLayout = currentPetWindowLayout ?? (keepPetAnchored ? getPetWindowLayout() : null);
   currentPetWindowLayout = nextLayout;
 
   try {
@@ -987,12 +977,12 @@ async function resizePetWindowToLayout({ keepPetAnchored = false, hasBubble = nu
   }
 }
 
-function getPetWindowLayout(hasBubble) {
+function getPetWindowLayout() {
   const petWidth = CELL_WIDTH * scale;
   const petHeight = CELL_HEIGHT * scale;
   const baseWidth = petWidth + PET_WINDOW_PADDING;
-  const width = Math.ceil(hasBubble ? Math.max(baseWidth, BUBBLE_WINDOW_WIDTH) : baseWidth);
-  const height = Math.ceil(petHeight + PET_WINDOW_PADDING + (hasBubble ? 82 : 0));
+  const width = Math.ceil(Math.max(baseWidth, BUBBLE_WINDOW_WIDTH));
+  const height = Math.ceil(petHeight + PET_WINDOW_PADDING + BUBBLE_WINDOW_HEIGHT);
 
   return { width, height };
 }
