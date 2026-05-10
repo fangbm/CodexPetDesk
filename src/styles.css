@@ -280,14 +280,9 @@ input {
   position: sticky;
   top: 38px;
   z-index: 2;
-  grid-template-columns: minmax(0, 1fr) 164px;
   align-items: center;
   background: rgb(29 35 37 / 0.94);
   backdrop-filter: blur(16px);
-}
-
-.petdex-searchbar .file-actions {
-  grid-template-columns: 1fr 1fr;
 }
 
 .section-title {
@@ -473,6 +468,10 @@ input {
   background: rgb(85 223 178 / 0.08);
 }
 
+.pet-card.is-installed {
+  border-color: rgb(137 184 218 / 0.28);
+}
+
 .pet-card-thumb {
   width: 54px;
   height: 54px;
@@ -510,7 +509,7 @@ input {
 }
 
 .pet-card-action {
-  width: 66px;
+  width: 82px;
   height: 30px;
   border: 1px solid rgb(85 223 178 / 0.44);
   border-radius: 6px;
@@ -526,6 +525,12 @@ input {
 .primary-action:disabled {
   cursor: default;
   opacity: 0.58;
+}
+
+.pet-card.is-installed .pet-card-action {
+  border-color: rgb(137 184 218 / 0.34);
+  color: rgb(216 229 237 / 0.82);
+  background: rgb(137 184 218 / 0.08);
 }
 
 .empty-state {
@@ -568,8 +573,7 @@ body.is-dragging .panel {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
-  .file-actions,
-  .petdex-searchbar .file-actions {
+  .file-actions {
     grid-template-columns: minmax(0, 1fr);
   }
 

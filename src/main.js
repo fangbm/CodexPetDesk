@@ -58,8 +58,6 @@ const localPetListEl = document.querySelector("#local-pet-list");
 const petdexSearchEl = document.querySelector("#petdex-search");
 const petdexStatusEl = document.querySelector("#petdex-status");
 const petdexListEl = document.querySelector("#petdex-list");
-const refreshPetdexEl = document.querySelector("#refresh-petdex");
-const openPetdexEl = document.querySelector("#open-petdex");
 const stateButtons = [...document.querySelectorAll(".state-button")];
 const tabButtons = [...document.querySelectorAll("[data-page].tab-button")];
 const pageEls = [...document.querySelectorAll(".settings-page")];
@@ -139,8 +137,6 @@ resetStorageEl.addEventListener("click", async () => {
   await loadInstalledPets(invokeCommand);
 });
 
-refreshPetdexEl.addEventListener("click", () => loadPetdexPets({ force: true }));
-openPetdexEl.addEventListener("click", () => window.open("https://petdex.crafter.run", "_blank"));
 petdexSearchEl.addEventListener("input", renderPetdexPets);
 
 tabButtons.forEach((button) => {
@@ -300,6 +296,7 @@ async function loadInstalledPets(invoke) {
   }
 
   renderLocalPets();
+  renderPetdexPets();
   if (!installedPets.length) return;
 
   const currentStillExists = installedPets.some((pet) => pet.id === currentPet.id);
@@ -367,15 +364,12 @@ async function loadPetdexPets({ force = false } = {}) {
   if (petdexPets.length && !force) return;
 
   setPetdexStatus("Loading Petdex...");
-  refreshPetdexEl.disabled = true;
   try {
     petdexPets = await invokeCommand("fetch_petdex_pets");
     setPetdexStatus(`${petdexPets.length} pets found.`);
     renderPetdexPets();
   } catch (error) {
     setPetdexStatus(`Petdex load failed: ${error}`);
-  } finally {
-    refreshPetdexEl.disabled = false;
   }
 }
 
@@ -426,16 +420,36 @@ function renderLocalPetCard(pet) {
 }
 
 function renderPetdexPetCard(pet) {
+  const isInstalled = isPetdexPetInstalled(pet);
   return `
-    <article class="pet-card">
+    <article class="pet-card ${isInstalled ? "is-installed" : ""}">
       <div class="pet-card-thumb" style="--sprite-url: url('${escapeAttribute(pet.spritesheetUrl || "")}')"></div>
       <div class="pet-card-body">
         <strong>${escapeText(pet.displayName || pet.slug)}</strong>
         <span>${escapeText([pet.kind, pet.submittedBy && `by ${pet.submittedBy}`].filter(Boolean).join(" - ") || pet.slug)}</span>
       </div>
-      <button class="pet-card-action" data-install-pet="${escapeAttribute(pet.slug)}" type="button">Install</button>
+      <button class="pet-card-action" data-install-pet="${escapeAttribute(pet.slug)}" type="button" ${isInstalled ? "disabled" : ""}>
+        ${isInstalled ? "Installed" : "Install"}
+      </button>
     </article>
   `;
+}
+
+function isPetdexPetInstalled(pet) {
+  const slug = normalizePetKey(pet.slug);
+  if (!slug) return false;
+  return installedPets.some((installed) => {
+    const sourceDirName = normalizePetKey(pathBaseName(installed.sourceDir || ""));
+    return normalizePetKey(installed.id) === slug || sourceDirName === slug;
+  });
+}
+
+function pathBaseName(path) {
+  return String(path).split(/[\\/]/).filter(Boolean).pop() || "";
+}
+
+function normalizePetKey(value) {
+  return String(value || "").trim().toLowerCase();
 }
 
 async function installPetdexPet(slug) {
