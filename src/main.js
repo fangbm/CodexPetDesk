@@ -54,6 +54,7 @@ const checkUpdateEl = document.querySelector("#check-update");
 const updateStatusEl = document.querySelector("#update-status");
 const updateProxyEl = document.querySelector("#update-proxy");
 const installHooksEl = document.querySelector("#install-hooks");
+const testHookBubbleEl = document.querySelector("#test-hook-bubble");
 const hookStatusEl = document.querySelector("#hook-status");
 const petStoragePathEl = document.querySelector("#pet-storage-path");
 const chooseStorageEl = document.querySelector("#choose-storage");
@@ -137,6 +138,7 @@ updateProxyEl.addEventListener("change", () => {
 });
 
 installHooksEl.addEventListener("click", () => installCodeHooksFromSettings());
+testHookBubbleEl.addEventListener("click", () => testHookBubbleFromSettings());
 chooseStorageEl.addEventListener("click", choosePetStorageDir);
 resetStorageEl.addEventListener("click", async () => {
   localStorage.removeItem(PET_STORAGE_DIR_KEY);
@@ -280,6 +282,11 @@ async function initializeTauriRuntime() {
 
   await tauri.listen("pet-state-changed", (event) => {
     setState(String(event.payload), false);
+  });
+
+  await tauri.listen("code-task-complete", (event) => {
+    if (!event.payload || isSettingsWindow) return;
+    showTaskCompleteBubble(event.payload);
   });
 
   if (!isSettingsWindow) {
@@ -544,12 +551,25 @@ async function installCodeHooksFromSettings() {
   try {
     const status = await invokeCommand("install_code_hooks");
     renderHookStatus(status);
-    showSettingsMessage("Code hooks installed.");
+    showSettingsMessage("Code hooks installed. Restart or start a new Code session for hooks to take effect.");
     if (!isSettingsWindow) showSpeechBubble("Code hooks 已安装。");
   } catch (error) {
     setHookStatus(`Hook install failed: ${error}`);
   } finally {
     installHooksEl.disabled = false;
+  }
+}
+
+async function testHookBubbleFromSettings() {
+  if (!invokeCommand) return;
+  testHookBubbleEl.disabled = true;
+  try {
+    await invokeCommand("test_hook_bubble");
+    setHookStatus("Test sent. Check the pet window for the bubble.");
+  } catch (error) {
+    setHookStatus(`Bubble test failed: ${error}`);
+  } finally {
+    testHookBubbleEl.disabled = false;
   }
 }
 
@@ -567,7 +587,7 @@ function renderHookStatus(status) {
     .filter((target) => target.installed)
     .map((target) => target.name);
   setHookStatus(installedTargets.length
-    ? `Installed for ${installedTargets.join(", ")}.`
+    ? `Installed for ${installedTargets.join(", ")}. Restart open Code sessions to reload hooks.`
     : "Hooks are not installed yet.");
 }
 

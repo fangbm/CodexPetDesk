@@ -91,7 +91,7 @@ struct HookStatus {
     targets: Vec<HookTargetStatus>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct HookEvent {
     #[serde(default)]
@@ -157,6 +157,22 @@ fn install_code_hooks() -> Result<HookStatus, String> {
     install_codex_hook(&script)?;
     install_claude_hook(&script)?;
     build_hook_status()
+}
+
+#[tauri::command]
+fn test_hook_bubble(app: tauri::AppHandle) -> Result<(), String> {
+    app.emit(
+        "code-task-complete",
+        HookEvent {
+            event_type: String::new(),
+            r#type: "complete".to_string(),
+            agent: "codex".to_string(),
+            message: "测试提醒：任务已经完成。".to_string(),
+            cwd: String::new(),
+            timestamp: 0,
+        },
+    )
+    .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -712,6 +728,7 @@ pub fn run() {
             install_code_hooks,
             install_petdex_pet,
             list_codex_pets,
+            test_hook_bubble,
             take_hook_events
         ])
         .run(tauri::generate_context!())
