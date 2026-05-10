@@ -9,6 +9,12 @@ const MIN_SCALE = 0.6;
 const MAX_SCALE = 2;
 const WHEEL_SCALE_STEP = 0.08;
 const STARTUP_UPDATE_CHECK_KEY = "codex-pet-desk.check-updates-on-startup";
+const UPDATE_CHECK_TIMEOUT = 20000;
+const UPDATE_PROXY_CANDIDATES = [
+  "http://127.0.0.1:7890",
+  "http://127.0.0.1:7897",
+  "http://127.0.0.1:10809"
+];
 const isSettingsWindow = new URLSearchParams(window.location.search).has("settings");
 
 const STATES = {
@@ -288,9 +294,12 @@ function setAppVersion(text) {
 
 function setUpdateStatus(message) {
   updateStatusEl.textContent = message;
+  updateStatusEl.title = message;
 }
 
 async function checkForUpdates({ manual = false } = {}) {
+  let lastError = null;
+
   try {
     if (manual) {
       checkUpdateEl.disabled = true;
@@ -301,7 +310,21 @@ async function checkForUpdates({ manual = false } = {}) {
       import("@tauri-apps/plugin-updater"),
       import("@tauri-apps/plugin-process")
     ]);
-    const update = await check();
+
+    let update = null;
+    for (const attempt of getUpdateCheckAttempts()) {
+      try {
+        if (manual && attempt.proxy) setUpdateStatus(`Checking through ${attempt.proxy}...`);
+        update = await check(attempt.options);
+        lastError = null;
+        break;
+      } catch (error) {
+        lastError = error;
+        if (!isRequestError(error)) throw error;
+      }
+    }
+
+    if (lastError) throw lastError;
     if (!update) {
       if (manual) setUpdateStatus(`Version ${appVersion} is up to date.`);
       return;
@@ -320,9 +343,24 @@ async function checkForUpdates({ manual = false } = {}) {
   }
 }
 
+function getUpdateCheckAttempts() {
+  return [
+    { options: { timeout: UPDATE_CHECK_TIMEOUT } },
+    ...UPDATE_PROXY_CANDIDATES.map((proxy) => ({
+      proxy,
+      options: { timeout: UPDATE_CHECK_TIMEOUT, proxy }
+    }))
+  ];
+}
+
+function isRequestError(error) {
+  return /request|connect|connection|dns|resolve|timeout|timed out|network|url/i.test(String(error?.message || error || ""));
+}
+
 function updateErrorMessage(error) {
   const detail = String(error?.message || error || "").trim();
   if (!detail) return "Update check failed.";
+  if (isRequestError(detail)) return "Update check failed. GitHub may be unreachable. Check your network or start a local proxy on 127.0.0.1:7890.";
   if (/platform/i.test(detail)) return "No update package for this platform yet.";
   if (/signature|pubkey|public key/i.test(detail)) return "Update signature verification failed.";
   if (/404|not found/i.test(detail)) return "Update manifest was not found.";
