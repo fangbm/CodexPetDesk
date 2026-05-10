@@ -10,6 +10,7 @@ const MAX_SCALE = 2;
 const WHEEL_SCALE_STEP = 0.08;
 const STARTUP_UPDATE_CHECK_KEY = "codex-pet-desk.check-updates-on-startup";
 const PET_STORAGE_DIR_KEY = "codex-pet-desk.pet-storage-dir";
+const UPDATE_PROXY_KEY = "codex-pet-desk.update-proxy";
 const UPDATE_CHECK_TIMEOUT = 20000;
 const UPDATE_PROXY_CANDIDATES = [
   "http://127.0.0.1:7890",
@@ -49,6 +50,7 @@ const appVersionEl = document.querySelector("#app-version");
 const startupUpdateCheckEl = document.querySelector("#startup-update-check");
 const checkUpdateEl = document.querySelector("#check-update");
 const updateStatusEl = document.querySelector("#update-status");
+const updateProxyEl = document.querySelector("#update-proxy");
 const petStoragePathEl = document.querySelector("#pet-storage-path");
 const chooseStorageEl = document.querySelector("#choose-storage");
 const resetStorageEl = document.querySelector("#reset-storage");
@@ -115,6 +117,18 @@ startupUpdateCheckEl.addEventListener("change", () => {
 
 checkUpdateEl.addEventListener("click", () => {
   checkForUpdates({ manual: true });
+});
+
+updateProxyEl.addEventListener("change", () => {
+  const proxy = normalizeProxyUrl(updateProxyEl.value);
+  updateProxyEl.value = proxy;
+  if (proxy) {
+    localStorage.setItem(UPDATE_PROXY_KEY, proxy);
+    setUpdateStatus(`Update proxy set to ${proxy}.`);
+  } else {
+    localStorage.removeItem(UPDATE_PROXY_KEY);
+    setUpdateStatus("Update checks will connect directly first.");
+  }
 });
 
 chooseStorageEl.addEventListener("click", choosePetStorageDir);
@@ -418,6 +432,7 @@ function setPetdexStatus(message) {
 
 function initializeUpdateSettings() {
   startupUpdateCheckEl.checked = shouldCheckUpdatesOnStartup();
+  updateProxyEl.value = getConfiguredUpdateProxy();
   setUpdateStatus(startupUpdateCheckEl.checked
     ? "Updates are checked automatically."
     : "Startup checks are disabled.");
@@ -483,13 +498,32 @@ async function checkForUpdates({ manual = false } = {}) {
 }
 
 function getUpdateCheckAttempts() {
+  const configuredProxy = getConfiguredUpdateProxy();
+  const proxies = [
+    configuredProxy,
+    ...UPDATE_PROXY_CANDIDATES
+  ].filter(Boolean);
+  const uniqueProxies = [...new Set(proxies)];
+
   return [
     { options: { timeout: UPDATE_CHECK_TIMEOUT } },
-    ...UPDATE_PROXY_CANDIDATES.map((proxy) => ({
+    ...uniqueProxies.map((proxy) => ({
       proxy,
       options: { timeout: UPDATE_CHECK_TIMEOUT, proxy }
     }))
   ];
+}
+
+function getConfiguredUpdateProxy() {
+  return normalizeProxyUrl(localStorage.getItem(UPDATE_PROXY_KEY) || "");
+}
+
+function normalizeProxyUrl(value) {
+  const proxy = String(value || "").trim();
+  if (!proxy) return "";
+  if (/^(https?|socks5?):\/\/.+/i.test(proxy)) return proxy;
+  if (/^(127\.0\.0\.1|localhost):\d+$/i.test(proxy)) return `http://${proxy}`;
+  return proxy;
 }
 
 function isRequestError(error) {
@@ -499,7 +533,7 @@ function isRequestError(error) {
 function updateErrorMessage(error) {
   const detail = String(error?.message || error || "").trim();
   if (!detail) return "Update check failed.";
-  if (isRequestError(detail)) return "Update check failed. GitHub may be unreachable. Check your network or start a local proxy on 127.0.0.1:7890.";
+  if (isRequestError(detail)) return `Update check failed. Set the proxy field to your active proxy, then retry. Detail: ${detail}`;
   if (/platform/i.test(detail)) return "No update package for this platform yet.";
   if (/signature|pubkey|public key/i.test(detail)) return "Update signature verification failed.";
   if (/404|not found/i.test(detail)) return "Update manifest was not found.";
