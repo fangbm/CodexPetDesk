@@ -13,100 +13,146 @@
       </section>
 
       <section id="panel" class="panel">
-        <div class="settings-header">
-          <div class="pet-meta">
-            <strong>Codex Pet Desk</strong>
-            <span id="app-version">Version ...</span>
-          </div>
-          <span class="status-pill">Desktop pet</span>
-        </div>
-
-        <div class="settings-page is-active" data-page="settings">
-        <div class="settings-section">
-          <span id="pet-description" class="pet-description">Adjust how the desktop pet behaves.</span>
-          <label class="scale-control">
-            <span>Size</span>
-            <input id="scale" type="range" min="0.6" max="2" step="0.05" value="1" />
-          </label>
-        </div>
-
-        <div class="settings-section">
-          <div class="section-title">Storage</div>
-          <label class="storage-control">
-            <span>Pet folder</span>
-            <input id="pet-storage-path" type="text" readonly />
-          </label>
-          <div class="file-actions">
-            <button id="choose-storage" class="file-button" type="button">Choose folder</button>
-            <button id="reset-storage" class="file-button" type="button">Use Codex folder</button>
-          </div>
-        </div>
-
-        <div class="settings-section">
-          <div class="section-title">Updates</div>
-          <label class="toggle-row">
-            <span>
-              <strong>Check on startup</strong>
-              <small id="update-status">Updates are checked automatically.</small>
-            </span>
-            <input id="startup-update-check" type="checkbox" checked />
-          </label>
-          <label class="storage-control">
-            <span>Proxy</span>
-            <input id="update-proxy" type="url" placeholder="Direct or http://127.0.0.1:7890" />
-          </label>
-          <button id="check-update" class="primary-action" type="button">Check for updates</button>
-        </div>
-
-        <div class="settings-section">
-          <div class="section-title">Code Hooks</div>
-          <label class="toggle-row">
-            <span>
-              <strong>Task complete bubble</strong>
-              <small id="hook-status">Hooks are not installed yet.</small>
-            </span>
-          </label>
-          <div class="file-actions">
-            <button id="install-hooks" class="file-button" type="button">Install hooks</button>
-            <button id="test-hook-bubble" class="file-button" type="button">Test bubble</button>
-          </div>
-        </div>
-
-        </div>
-
-        <div class="settings-page" data-page="pets">
-          <div class="settings-section petdex-searchbar">
-            <label class="storage-control">
-              <span>Search</span>
-              <input id="petdex-search" type="search" placeholder="Search pets" />
-            </label>
-          </div>
-
-          <div class="settings-tabs pet-tabs" role="tablist" aria-label="Pet management pages">
-            <button class="tab-button is-active" data-pet-page="local" type="button">Local</button>
-            <button class="tab-button" data-pet-page="petdex" type="button">Petdex</button>
-          </div>
-
-          <div class="pet-page is-active" data-pet-page="local">
-            <div class="settings-section">
-              <div class="section-title">Local Pets</div>
-              <div class="file-actions">
-                <label class="file-button">
-                  Open pet
-                  <input id="file-input" type="file" accept=".json,.webp,.png" multiple />
-                </label>
-                <label class="file-button">
-                  Open folder
-                  <input id="folder-input" type="file" webkitdirectory multiple />
-                </label>
-              </div>
-              <div id="local-pet-list" class="pet-list" aria-live="polite"></div>
+        <aside class="settings-sidebar">
+          <div class="settings-brand">
+            <span class="brand-mark">C</span>
+            <div class="pet-meta">
+              <strong>Codex Pet Desk</strong>
+              <span id="app-version">Version ...</span>
             </div>
           </div>
 
-          <div class="pet-page" data-pet-page="petdex">
-            <small id="petdex-status" class="status-text">Loading Petdex...</small>
-            <div id="petdex-list" class="pet-list" aria-live="polite"></div>
+          <nav class="settings-nav" aria-label="Settings pages">
+            <button class="tab-button is-active" data-page="settings" type="button">
+              <span class="nav-icon">⚙</span>
+              设置
+            </button>
+            <button class="tab-button" data-page="pets" type="button">
+              <span class="nav-icon">□</span>
+              宠物
+            </button>
+          </nav>
+
+          <div class="settings-sidebar-footer">
+            <span class="status-pill">Desktop pet</span>
+          </div>
+        </aside>
+
+        <div class="settings-main">
+          <div class="settings-header">
+            <div>
+              <h1>设置</h1>
+              <p>管理桌宠、更新、存储位置和 Codex 提醒。</p>
+            </div>
+            <label class="settings-search">
+              <span>搜索</span>
+              <input type="search" placeholder="搜索设置项..." />
+            </label>
+          </div>
+
+          <div class="settings-tabs settings-category-tabs" role="tablist" aria-label="Settings categories">
+            <button class="tab-button is-active" type="button">基本设置</button>
+            <button class="tab-button" type="button">更新</button>
+            <button class="tab-button" type="button">Code Hooks</button>
+            <button class="tab-button" type="button">存储</button>
+          </div>
+
+          <div class="settings-page is-active" data-page="settings">
+            <section class="settings-section settings-card settings-card--wide">
+              <div class="section-title">桌宠设置</div>
+              <div class="pet-settings-grid">
+                <div class="settings-pet-preview">
+                  <div class="preview-orb"></div>
+                  <strong>当前桌宠</strong>
+                  <span id="pet-description" class="pet-description">Adjust how the desktop pet behaves.</span>
+                </div>
+                <div class="settings-form">
+                  <label class="scale-control">
+                    <span>大小</span>
+                    <input id="scale" type="range" min="0.6" max="2" step="0.05" value="1" />
+                  </label>
+                  <div class="setting-hint">按住 Ctrl 并滚动鼠标滚轮也可以调整桌宠大小。</div>
+                </div>
+              </div>
+            </section>
+
+            <section class="settings-section settings-card">
+              <div class="section-title">存储设置</div>
+              <label class="storage-control">
+                <span>Pet 文件夹</span>
+                <input id="pet-storage-path" type="text" readonly />
+              </label>
+              <div class="file-actions">
+                <button id="choose-storage" class="file-button" type="button">选择文件夹</button>
+                <button id="reset-storage" class="file-button" type="button">使用 Codex 目录</button>
+              </div>
+            </section>
+
+            <section class="settings-section settings-card">
+              <div class="section-title">更新设置</div>
+              <label class="toggle-row">
+                <span>
+                  <strong>启动时检查更新</strong>
+                  <small id="update-status">Updates are checked automatically.</small>
+                </span>
+                <input id="startup-update-check" type="checkbox" checked />
+              </label>
+              <label class="storage-control">
+                <span>代理</span>
+                <input id="update-proxy" type="url" placeholder="Direct or http://127.0.0.1:7890" />
+              </label>
+              <button id="check-update" class="primary-action" type="button">检查更新</button>
+            </section>
+
+            <section class="settings-section settings-card settings-card--wide">
+              <div class="section-title">Code Hooks</div>
+              <label class="toggle-row">
+                <span>
+                  <strong>任务完成气泡</strong>
+                  <small id="hook-status">Hooks are not installed yet.</small>
+                </span>
+              </label>
+              <div class="file-actions">
+                <button id="install-hooks" class="file-button" type="button">安装 Hooks</button>
+                <button id="test-hook-bubble" class="file-button" type="button">测试气泡</button>
+              </div>
+            </section>
+          </div>
+
+          <div class="settings-page" data-page="pets">
+            <div class="settings-section settings-card petdex-searchbar">
+              <label class="storage-control">
+                <span>搜索</span>
+                <input id="petdex-search" type="search" placeholder="搜索宠物" />
+              </label>
+            </div>
+
+            <div class="settings-tabs pet-tabs" role="tablist" aria-label="Pet management pages">
+              <button class="tab-button is-active" data-pet-page="local" type="button">本地</button>
+              <button class="tab-button" data-pet-page="petdex" type="button">Petdex</button>
+            </div>
+
+            <div class="pet-page is-active" data-pet-page="local">
+              <div class="settings-section settings-card">
+                <div class="section-title">本地宠物</div>
+                <div class="file-actions">
+                  <label class="file-button">
+                    打开 Pet
+                    <input id="file-input" type="file" accept=".json,.webp,.png" multiple />
+                  </label>
+                  <label class="file-button">
+                    打开文件夹
+                    <input id="folder-input" type="file" webkitdirectory multiple />
+                  </label>
+                </div>
+                <div id="local-pet-list" class="pet-list" aria-live="polite"></div>
+              </div>
+            </div>
+
+            <div class="pet-page" data-pet-page="petdex">
+              <small id="petdex-status" class="status-text">Loading Petdex...</small>
+              <div id="petdex-list" class="pet-list" aria-live="polite"></div>
+            </div>
           </div>
         </div>
       </section>
