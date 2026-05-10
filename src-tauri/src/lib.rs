@@ -1304,6 +1304,8 @@ fn tray_menu(app_handle: &tauri::AppHandle, pet_visible: bool) -> tauri::menu::M
         .text(MENU_OPEN_SETTINGS, "设置")
         .text(MENU_OPEN_PETS, "宠物")
         .text(MENU_TOGGLE_PET, visibility_label)
+        .separator()
+        .text(MENU_QUIT, "退出")
         .build()
         .expect("failed to build tray menu")
 }
