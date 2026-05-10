@@ -22,20 +22,12 @@
 
         <div class="settings-tabs" role="tablist" aria-label="Settings pages">
           <button id="tab-settings" class="tab-button is-active" data-page="settings" type="button">Settings</button>
-          <button id="tab-petdex" class="tab-button" data-page="petdex" type="button">Petdex</button>
+          <button id="tab-pets" class="tab-button" data-page="pets" type="button">Pets</button>
         </div>
 
         <div class="settings-page is-active" data-page="settings">
         <div class="settings-section">
-          <span id="pet-description" class="pet-description">Choose an installed Codex pet or load a pet package.</span>
-
-          <label id="native-pets" class="native-pets is-hidden">
-            <span>Pet</span>
-            <select id="native-pet-select">
-              <option value="">No installed pets found</option>
-            </select>
-          </label>
-
+          <span id="pet-description" class="pet-description">Adjust how the desktop pet behaves.</span>
           <label class="scale-control">
             <span>Size</span>
             <input id="scale" type="range" min="0.6" max="2" step="0.05" value="1" />
@@ -83,22 +75,24 @@
           <button id="check-update" class="primary-action" type="button">Check for updates</button>
         </div>
 
-        <div class="settings-section">
-          <div class="section-title">Pet Packages</div>
-          <div class="file-actions">
-            <label class="file-button">
-              Open pet
-              <input id="file-input" type="file" accept=".json,.webp,.png" multiple />
-            </label>
-            <label class="file-button">
-              Open folder
-              <input id="folder-input" type="file" webkitdirectory multiple />
-            </label>
-          </div>
-        </div>
         </div>
 
-        <div class="settings-page" data-page="petdex">
+        <div class="settings-page" data-page="pets">
+          <div class="settings-section">
+            <div class="section-title">Local Pets</div>
+            <div class="file-actions">
+              <label class="file-button">
+                Open pet
+                <input id="file-input" type="file" accept=".json,.webp,.png" multiple />
+              </label>
+              <label class="file-button">
+                Open folder
+                <input id="folder-input" type="file" webkitdirectory multiple />
+              </label>
+            </div>
+            <div id="local-pet-list" class="pet-list" aria-live="polite"></div>
+          </div>
+
           <div class="settings-section">
             <div class="section-title">Petdex</div>
             <label class="storage-control">
@@ -112,7 +106,7 @@
             <small id="petdex-status" class="status-text">Loading Petdex...</small>
           </div>
 
-          <div id="petdex-list" class="petdex-list" aria-live="polite"></div>
+          <div id="petdex-list" class="pet-list" aria-live="polite"></div>
         </div>
       </section>
     </main>

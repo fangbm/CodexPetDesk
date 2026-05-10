@@ -379,12 +379,12 @@ input {
   overflow-wrap: anywhere;
 }
 
-.petdex-list {
+.pet-list {
   display: grid;
   gap: 8px;
 }
 
-.petdex-card {
+.pet-card {
   display: grid;
   grid-template-columns: 54px 1fr auto;
   gap: 10px;
@@ -396,7 +396,12 @@ input {
   background: rgb(255 255 255 / 0.045);
 }
 
-.petdex-thumb {
+.pet-card.is-active {
+  border-color: rgb(85 223 178 / 0.5);
+  background: rgb(85 223 178 / 0.08);
+}
+
+.pet-card-thumb {
   width: 54px;
   height: 54px;
   border: 1px solid rgb(255 255 255 / 0.1);
@@ -405,34 +410,34 @@ input {
   background-image: var(--sprite-url);
   background-position: 0 0;
   background-repeat: no-repeat;
-  background-size: 399px 432px;
+  background-size: 432px 468px;
   image-rendering: pixelated;
 }
 
-.petdex-card-body {
+.pet-card-body {
   display: grid;
   gap: 3px;
   min-width: 0;
 }
 
-.petdex-card-body strong,
-.petdex-card-body span {
+.pet-card-body strong,
+.pet-card-body span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.petdex-card-body strong {
+.pet-card-body strong {
   color: #f7f2e8;
   font-size: 13px;
 }
 
-.petdex-card-body span {
+.pet-card-body span {
   color: rgb(247 242 232 / 0.58);
   font-size: 11px;
 }
 
-.petdex-install {
+.pet-card-action {
   width: 66px;
   height: 30px;
   border: 1px solid rgb(85 223 178 / 0.44);
@@ -444,7 +449,7 @@ input {
   font-weight: 700;
 }
 
-.petdex-install:disabled,
+.pet-card-action:disabled,
 .file-button:disabled,
 .primary-action:disabled {
   cursor: default;

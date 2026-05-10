@@ -43,8 +43,6 @@ const panelEl = document.querySelector("#panel");
 const fileInputEl = document.querySelector("#file-input");
 const folderInputEl = document.querySelector("#folder-input");
 const scaleEl = document.querySelector("#scale");
-const nativePetsEl = document.querySelector("#native-pets");
-const nativePetSelectEl = document.querySelector("#native-pet-select");
 const petDescriptionEl = document.querySelector("#pet-description");
 const appVersionEl = document.querySelector("#app-version");
 const startupUpdateCheckEl = document.querySelector("#startup-update-check");
@@ -54,6 +52,7 @@ const updateProxyEl = document.querySelector("#update-proxy");
 const petStoragePathEl = document.querySelector("#pet-storage-path");
 const chooseStorageEl = document.querySelector("#choose-storage");
 const resetStorageEl = document.querySelector("#reset-storage");
+const localPetListEl = document.querySelector("#local-pet-list");
 const petdexSearchEl = document.querySelector("#petdex-search");
 const petdexStatusEl = document.querySelector("#petdex-status");
 const petdexListEl = document.querySelector("#petdex-list");
@@ -95,10 +94,6 @@ initializeUpdateSettings();
 
 fileInputEl.addEventListener("change", () => loadFromFiles([...fileInputEl.files]));
 folderInputEl.addEventListener("change", () => loadFromFiles([...folderInputEl.files]));
-nativePetSelectEl.addEventListener("change", () => {
-  const pet = installedPets.find((candidate) => candidate.id === nativePetSelectEl.value);
-  if (pet) loadNativePet(pet);
-});
 
 scaleEl.addEventListener("input", () => {
   updateScale(Number(scaleEl.value));
@@ -295,11 +290,13 @@ async function loadInstalledPets(invoke) {
     return;
   }
 
-  nativePetsEl.classList.toggle("is-hidden", !installedPets.length);
-  nativePetSelectEl.innerHTML = installedPets.length
-    ? installedPets.map((pet) => `<option value="${escapeAttribute(pet.id)}">${escapeText(pet.displayName)}</option>`).join("")
-    : '<option value="">No installed pets found</option>';
-  if (installedPets.length) loadNativePet(installedPets[0]);
+  renderLocalPets();
+  if (!installedPets.length) return;
+
+  const currentStillExists = installedPets.some((pet) => pet.id === currentPet.id);
+  if (currentPet === SAMPLE_PET || !currentStillExists) {
+    loadNativePet(installedPets[0]);
+  }
 }
 
 function loadNativePet(pet) {
@@ -309,9 +306,9 @@ function loadNativePet(pet) {
   currentPet.spriteDataUrl = pet.spriteDataUrl;
 
   applyPet(currentPet);
-  nativePetSelectEl.value = pet.id;
   emitEvent?.("active-pet-changed", pet);
   setState("idle");
+  renderLocalPets();
 }
 
 async function getTauriApi() {
@@ -333,6 +330,7 @@ async function getTauriApi() {
 function setSettingsPage(page) {
   tabButtons.forEach((button) => button.classList.toggle("is-active", button.dataset.page === page));
   pageEls.forEach((pageEl) => pageEl.classList.toggle("is-active", pageEl.dataset.page === page));
+  if (page === "pets") loadPetdexPets();
 }
 
 function renderPetStorageDir() {
@@ -384,15 +382,43 @@ function renderPetdexPets() {
   });
 }
 
+function renderLocalPets() {
+  if (!localPetListEl) return;
+  localPetListEl.innerHTML = installedPets.length
+    ? installedPets.map(renderLocalPetCard).join("")
+    : '<div class="empty-state">No local pets found in the selected folder.</div>';
+
+  localPetListEl.querySelectorAll("[data-use-pet]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const pet = installedPets.find((candidate) => candidate.id === button.dataset.usePet);
+      if (pet) loadNativePet(pet);
+    });
+  });
+}
+
+function renderLocalPetCard(pet) {
+  const isActive = pet.id === currentPet.id;
+  return `
+    <article class="pet-card ${isActive ? "is-active" : ""}">
+      <div class="pet-card-thumb" style="--sprite-url: url('${escapeAttribute(pet.spriteDataUrl || "")}')"></div>
+      <div class="pet-card-body">
+        <strong>${escapeText(pet.displayName)}</strong>
+        <span>${escapeText(pet.description || pet.sourceDir || pet.id)}</span>
+      </div>
+      <button class="pet-card-action" data-use-pet="${escapeAttribute(pet.id)}" type="button">${isActive ? "Active" : "Use"}</button>
+    </article>
+  `;
+}
+
 function renderPetdexPetCard(pet) {
   return `
-    <article class="petdex-card">
-      <div class="petdex-thumb" style="--sprite-url: url('${escapeAttribute(pet.spritesheetUrl || "")}')"></div>
-      <div class="petdex-card-body">
+    <article class="pet-card">
+      <div class="pet-card-thumb" style="--sprite-url: url('${escapeAttribute(pet.spritesheetUrl || "")}')"></div>
+      <div class="pet-card-body">
         <strong>${escapeText(pet.displayName || pet.slug)}</strong>
         <span>${escapeText([pet.kind, pet.submittedBy && `by ${pet.submittedBy}`].filter(Boolean).join(" - ") || pet.slug)}</span>
       </div>
-      <button class="petdex-install" data-install-pet="${escapeAttribute(pet.slug)}" type="button">Install</button>
+      <button class="pet-card-action" data-install-pet="${escapeAttribute(pet.slug)}" type="button">Install</button>
     </article>
   `;
 }
@@ -414,7 +440,7 @@ async function installPetdexPet(slug) {
     setPetdexStatus(`${installed.displayName} installed.`);
     await loadInstalledPets(invokeCommand);
     loadNativePet(installed);
-    setSettingsPage("settings");
+    setSettingsPage("pets");
   } catch (error) {
     setPetdexStatus(`Install failed: ${error}`);
   } finally {
