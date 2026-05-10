@@ -369,7 +369,6 @@ input {
   gap: 6px;
 }
 
-.state-button,
 .file-button,
 .primary-action {
   min-width: 0;
@@ -381,24 +380,9 @@ input {
   cursor: pointer;
 }
 
-.state-button {
-  padding: 0 6px;
-  overflow: hidden;
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.state-button:hover,
 .file-button:hover,
 .primary-action:hover {
   background: rgb(255 255 255 / 0.14);
-}
-
-.state-button.is-active {
-  border-color: rgb(65 198 158 / 0.7);
-  color: #061713;
-  background: #55dfb2;
 }
 
 .scale-control,

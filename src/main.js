@@ -6,7 +6,6 @@ const COLUMNS = 8;
 const ROWS = 9;
 const PET_WINDOW_PADDING = 16;
 const BUBBLE_WINDOW_WIDTH = 276;
-const BUBBLE_STAGE_TOP_PADDING = 76;
 const BUBBLE_STAGE_BOTTOM_PADDING = 4;
 const MIN_SCALE = 0.6;
 const MAX_SCALE = 2;
@@ -935,8 +934,8 @@ async function resizePetWindowToLayout() {
       currentWindow.scaleFactor?.() ?? Promise.resolve(1)
     ]);
     const factor = Number.isFinite(scaleFactor) && scaleFactor > 0 ? scaleFactor : 1;
-    const nextX = Math.round(position.x + (previousLayout.petOffsetX - nextLayout.petOffsetX) * factor);
-    const nextY = Math.round(position.y + (previousLayout.petOffsetY - nextLayout.petOffsetY) * factor);
+    const nextX = Math.round(position.x + (previousLayout.petCenterX - nextLayout.petCenterX) * factor);
+    const nextY = Math.round(position.y + (previousLayout.petCenterY - nextLayout.petCenterY) * factor);
 
     window.clearTimeout(windowLayoutMoveTimer);
     windowLayoutMoveTimer = window.setTimeout(() => {
@@ -959,10 +958,12 @@ function getPetWindowLayout(hasBubble) {
   const height = Math.ceil(petHeight + PET_WINDOW_PADDING + (hasBubble ? 82 : 0));
   const petOffsetX = (width - petWidth) / 2;
   const petOffsetY = hasBubble
-    ? BUBBLE_STAGE_TOP_PADDING + ((height - BUBBLE_STAGE_TOP_PADDING - BUBBLE_STAGE_BOTTOM_PADDING - petHeight) / 2)
+    ? height - BUBBLE_STAGE_BOTTOM_PADDING - petHeight
     : (height - petHeight) / 2;
+  const petCenterX = petOffsetX + petWidth / 2;
+  const petCenterY = petOffsetY + petHeight / 2;
 
-  return { width, height, petOffsetX, petOffsetY };
+  return { width, height, petCenterX, petCenterY };
 }
 
 function readFileAsDataUrl(file) {
