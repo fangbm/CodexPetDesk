@@ -5,6 +5,7 @@ const CELL_HEIGHT = 208;
 const COLUMNS = 8;
 const ROWS = 9;
 const PET_WINDOW_PADDING = 16;
+const BUBBLE_WINDOW_WIDTH = 276;
 const MIN_SCALE = 0.6;
 const MAX_SCALE = 2;
 const WHEEL_SCALE_STEP = 0.08;
@@ -286,7 +287,7 @@ async function initializeTauriRuntime() {
 
   await tauri.listen("code-task-complete", (event) => {
     if (!event.payload || isSettingsWindow) return;
-    showTaskCompleteBubble(event.payload);
+    showCodeTaskBubble(event.payload);
   });
 
   if (!isSettingsWindow) {
@@ -538,7 +539,7 @@ async function maybePromptForHooks() {
   try {
     await invokeCommand("install_code_hooks");
     await refreshHookStatus();
-    showSpeechBubble("Code hooks 已安装，任务完成时我会提醒你。");
+    showSpeechBubble({ title: "Code Hooks", message: "已安装，任务完成时我会提醒你。", state: "waving" });
   } catch (error) {
     console.info("Hook install skipped:", error);
   }
@@ -552,7 +553,7 @@ async function installCodeHooksFromSettings() {
     const status = await invokeCommand("install_code_hooks");
     renderHookStatus(status);
     showSettingsMessage("Code hooks installed. Restart or start a new Code session for hooks to take effect.");
-    if (!isSettingsWindow) showSpeechBubble("Code hooks 已安装。");
+    if (!isSettingsWindow) showSpeechBubble({ title: "Code Hooks", message: "已安装。", state: "waving" });
   } catch (error) {
     setHookStatus(`Hook install failed: ${error}`);
   } finally {
@@ -606,25 +607,46 @@ async function pollHookEvents() {
   if (!invokeCommand || isSettingsWindow) return;
   try {
     const events = await invokeCommand("take_hook_events");
-    const latestComplete = [...events].reverse().find((event) => {
+    const latestEvent = [...events].reverse().find((event) => {
       const type = event.type || event.eventType;
-      return type === "complete";
+      return ["running", "approval", "complete"].includes(type);
     });
-    if (latestComplete) {
-      showTaskCompleteBubble(latestComplete);
+    if (latestEvent) {
+      showCodeTaskBubble(latestEvent);
     }
   } catch (error) {
     console.info("Hook polling skipped:", error);
   }
 }
 
-function showTaskCompleteBubble(event) {
+function showCodeTaskBubble(event) {
+  const type = event.type || event.eventType;
   const agent = formatHookAgent(event.agent);
-  const detail = String(event.message || "").trim();
-  const message = detail && detail !== "任务已经完成"
-    ? `${agent} 任务已经完成：${detail}`
-    : `${agent} 任务已经完成。`;
-  showSpeechBubble(message);
+  if (type === "approval") {
+    showSpeechBubble({
+      title: event.title || "需要审批",
+      message: event.message || "有一个操作需要你审批。",
+      state: "waiting",
+      timeout: 120000
+    });
+    return;
+  }
+  if (type === "running") {
+    showSpeechBubble({
+      title: event.title || `${agent} 任务进行中`,
+      message: event.message || "任务正在进行中。",
+      state: "running",
+      timeout: 120000
+    });
+    return;
+  }
+
+  showSpeechBubble({
+    title: event.title || agent,
+    message: event.message || "任务已经完成。",
+    state: "waving",
+    timeout: 8500
+  });
 }
 
 function formatHookAgent(agent) {
@@ -634,13 +656,16 @@ function formatHookAgent(agent) {
   return "Code";
 }
 
-function showSpeechBubble(message) {
+function showSpeechBubble({ title = "", message = "", state = "waving", timeout = 8500 } = {}) {
   if (isSettingsWindow || !speechBubbleEl) return;
-  speechBubbleEl.textContent = message;
+  speechBubbleEl.innerHTML = `
+    <strong>${escapeText(title)}</strong>
+    <span>${escapeText(message)}</span>
+  `;
   appEl.classList.add("has-bubble");
-  setState("waving");
+  setState(state);
   window.clearTimeout(speechBubbleTimer);
-  speechBubbleTimer = window.setTimeout(hideSpeechBubble, 8500);
+  speechBubbleTimer = window.setTimeout(hideSpeechBubble, timeout);
   resizePetWindow();
 }
 
@@ -860,7 +885,8 @@ function updateScale(nextScale, broadcast = true) {
 function resizePetWindow() {
   if (isSettingsWindow || !currentWindow || !LogicalSize) return;
   const bubbleHeight = appEl.classList.contains("has-bubble") ? 82 : 0;
-  const width = Math.ceil(CELL_WIDTH * scale + PET_WINDOW_PADDING);
+  const petWidth = CELL_WIDTH * scale + PET_WINDOW_PADDING;
+  const width = Math.ceil(appEl.classList.contains("has-bubble") ? Math.max(petWidth, BUBBLE_WINDOW_WIDTH) : petWidth);
   const height = Math.ceil(CELL_HEIGHT * scale + PET_WINDOW_PADDING + bubbleHeight);
   currentWindow.setSize(new LogicalSize(width, height));
 }

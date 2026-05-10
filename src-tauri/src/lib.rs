@@ -101,6 +101,8 @@ struct HookEvent {
     #[serde(default)]
     agent: String,
     #[serde(default)]
+    title: String,
+    #[serde(default)]
     message: String,
     #[serde(default)]
     cwd: String,
@@ -148,7 +150,12 @@ fn default_pet_storage_dir() -> Result<String, String> {
 
 #[tauri::command]
 fn hook_status() -> Result<HookStatus, String> {
-    build_hook_status()
+    let status = build_hook_status()?;
+    if status.installed {
+        let _ = write_hook_script();
+        return build_hook_status();
+    }
+    Ok(status)
 }
 
 #[tauri::command]
@@ -167,6 +174,7 @@ fn test_hook_bubble(app: tauri::AppHandle) -> Result<(), String> {
             event_type: String::new(),
             r#type: "complete".to_string(),
             agent: "codex".to_string(),
+            title: "测试气泡".to_string(),
             message: "测试提醒：任务已经完成。".to_string(),
             cwd: String::new(),
             timestamp: 0,

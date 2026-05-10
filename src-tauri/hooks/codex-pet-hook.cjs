@@ -24,34 +24,51 @@ function handle(input) {
   handled = true;
 
   const context = parseJson(input);
-  const event = normalizeEvent(context.type || rawEvent);
-  if (event !== "complete") return;
+  const event = normalizeEvent(context);
+  if (!event) return;
 
-  const message = pickText(
-    context.summary,
-    context.message,
-    context.result,
-    context.description,
-    context["last-assistant-message"],
-    context.last_assistant_message
-  ) || "任务已经完成";
+  const title = resolveTitle(context, event);
+  const message = resolveMessage(context, event);
 
   writeEvent({
-    type: "complete",
+    type: event,
     agent,
-    message: truncate(message, 160),
+    title: truncate(title, 72),
+    message: truncate(message, event === "approval" ? 220 : 180),
     cwd: context.cwd || context.workingDirectory || context.working_directory || "",
     timestamp: Date.now()
   });
 }
 
-function normalizeEvent(event) {
-  const value = String(event || "").trim();
+function normalizeEvent(context) {
+  const value = String(context.type || context.event || rawEvent || "").trim();
+  const haystack = [
+    value,
+    context.kind,
+    context.name,
+    context.tool_name,
+    context.toolName,
+    context.message,
+    context.summary,
+    context.reason
+  ].filter(Boolean).join(" ").toLowerCase();
+
+  if (/(permission|approval|approve|confirm|confirmation|consent|authorize|auth|sandbox|escalat)/i.test(haystack)) {
+    return "approval";
+  }
   if (["Stop", "SessionEnd", "agentStop", "complete", "completed", "done"].includes(value)) {
     return "complete";
   }
-  if (agent === "codex" && rawEvent === "notify") return "complete";
-  return value.toLowerCase();
+  if (["running", "thinking", "tool_use", "tool_result", "notify"].includes(value)) {
+    return "running";
+  }
+  if (/(complete|completed|done|finish|finished|sessionend|agentstop|stop)/i.test(haystack)) {
+    return "complete";
+  }
+  if (/(start|running|thinking|tool|exec|command|notify|prompt|task)/i.test(haystack) || hasPromptContent(context)) {
+    return "running";
+  }
+  return null;
 }
 
 function writeEvent(event) {
@@ -74,6 +91,70 @@ function pickText(...values) {
     if (text) return text;
   }
   return "";
+}
+
+function resolveTitle(context, event) {
+  if (event === "approval") return "需要审批";
+  return firstLine(pickText(
+    context.sessionTitle,
+    context.session_title,
+    context.title,
+    promptFromMessages(context),
+    context.prompt,
+    context.userPrompt,
+    context.user_prompt,
+    context.message
+  ) || "Code 任务进行中");
+}
+
+function resolveMessage(context, event) {
+  if (event === "complete") return "任务已经完成。";
+  if (event === "approval") {
+    return pickText(
+      context.reason,
+      context.message,
+      context.prompt,
+      context.summary,
+      stringifyInput(context.tool_input || context.toolInput || context.input)
+    ) || "有一个操作需要你审批。";
+  }
+  return pickText(
+    promptFromMessages(context),
+    context.prompt,
+    context.userPrompt,
+    context.user_prompt,
+    context.summary,
+    context.message,
+    stringifyInput(context.tool_input || context.toolInput || context.input)
+  ) || "任务正在进行中。";
+}
+
+function hasPromptContent(context) {
+  return Boolean(promptFromMessages(context) || context.prompt || context.userPrompt || context.user_prompt);
+}
+
+function promptFromMessages(context) {
+  const messages = context["input-messages"] || context.inputMessages || context.messages;
+  if (!Array.isArray(messages)) return "";
+  const userMessage = messages.find((message) => message && message.role === "user") || messages[0];
+  const content = userMessage && userMessage.content;
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    const text = content.find((item) => item && item.type === "text" && typeof item.text === "string");
+    if (text) return text.text;
+  }
+  return "";
+}
+
+function stringifyInput(input) {
+  if (!input) return "";
+  if (typeof input === "string") return input;
+  if (typeof input !== "object") return "";
+  return pickText(input.command, input.path, input.file_path, input.prompt, input.query) || JSON.stringify(input);
+}
+
+function firstLine(value) {
+  return String(value || "").split(/\r?\n/).map((line) => line.trim()).find(Boolean) || "";
 }
 
 function parseJson(value) {
