@@ -96,6 +96,8 @@ let petdexPets = [];
 let speechBubbleTimer = 0;
 let hookPollTimer = 0;
 let windowLayoutMoveTimer = 0;
+let currentPetWindowLayout = null;
+let lastCodexActivityKey = "";
 
 appEl.classList.toggle("shell--settings", isSettingsWindow);
 appEl.classList.toggle("shell--pet", !isSettingsWindow);
@@ -662,9 +664,21 @@ async function pollHookEvents() {
     if (latestEvent) {
       showCodeTaskBubble(latestEvent);
     }
+    const activity = await invokeCommand("codex_activity");
+    if (activity && shouldShowCodexActivity(activity)) {
+      showCodeTaskBubble(activity);
+    }
   } catch (error) {
     console.info("Hook polling skipped:", error);
   }
+}
+
+function shouldShowCodexActivity(activity) {
+  const type = activity.type || activity.eventType;
+  const key = [type, activity.timestamp, activity.title, activity.message].join("|");
+  if (!type || key === lastCodexActivityKey) return false;
+  lastCodexActivityKey = key;
+  return ["running", "approval", "complete"].includes(type);
 }
 
 function showCodeTaskBubble(event) {
@@ -706,7 +720,6 @@ function formatHookAgent(agent) {
 
 function showSpeechBubble({ title = "", message = "", state = "waving", timeout = 8500 } = {}) {
   if (isSettingsWindow || !speechBubbleEl) return;
-  const petViewportCenter = capturePetViewportCenter();
   speechBubbleEl.innerHTML = `
     <strong>${escapeText(title)}</strong>
     <span>${escapeText(message)}</span>
@@ -715,15 +728,14 @@ function showSpeechBubble({ title = "", message = "", state = "waving", timeout 
   setState(state);
   window.clearTimeout(speechBubbleTimer);
   speechBubbleTimer = window.setTimeout(hideSpeechBubble, timeout);
-  resizePetWindow({ petViewportCenter });
+  resizePetWindow({ keepPetAnchored: true });
 }
 
 function hideSpeechBubble() {
-  const petViewportCenter = capturePetViewportCenter();
   appEl.classList.remove("has-bubble");
   if (speechBubbleEl) speechBubbleEl.textContent = "";
   if (!isPetHovered) setState("idle");
-  resizePetWindow({ petViewportCenter });
+  resizePetWindow({ keepPetAnchored: true });
 }
 
 async function checkForUpdates({ manual = false } = {}) {
@@ -936,29 +948,26 @@ function resizePetWindow(options = {}) {
   void resizePetWindowToLayout(options);
 }
 
-async function resizePetWindowToLayout({ petViewportCenter = null } = {}) {
+async function resizePetWindowToLayout({ keepPetAnchored = false } = {}) {
   if (isSettingsWindow || !currentWindow || !LogicalSize) return;
 
   const nextLayout = getPetWindowLayout(appEl.classList.contains("has-bubble"));
+  const previousLayout = currentPetWindowLayout;
+  currentPetWindowLayout = nextLayout;
 
   try {
+    if (keepPetAnchored && previousLayout && PhysicalPosition) {
+      const [position, scaleFactor] = await Promise.all([
+        currentWindow.outerPosition(),
+        currentWindow.scaleFactor?.() ?? Promise.resolve(1)
+      ]);
+      const factor = Number.isFinite(scaleFactor) && scaleFactor > 0 ? scaleFactor : 1;
+      const nextX = Math.round(position.x + ((previousLayout.width - nextLayout.width) / 2) * factor);
+      const nextY = Math.round(position.y + (previousLayout.height - nextLayout.height) * factor);
+      ignoreLayoutMoveEvents();
+      await currentWindow.setPosition(new PhysicalPosition(nextX, nextY));
+    }
     await currentWindow.setSize(new LogicalSize(nextLayout.width, nextLayout.height));
-    if (!petViewportCenter || !PhysicalPosition) return;
-
-    await nextAnimationFrame();
-    const nextPetCenter = capturePetViewportCenter();
-    if (!nextPetCenter) return;
-
-    const [position, scaleFactor] = await Promise.all([
-      currentWindow.outerPosition(),
-      currentWindow.scaleFactor?.() ?? Promise.resolve(1)
-    ]);
-    const factor = Number.isFinite(scaleFactor) && scaleFactor > 0 ? scaleFactor : 1;
-    const nextX = Math.round(position.x + (petViewportCenter.x - nextPetCenter.x) * factor);
-    const nextY = Math.round(position.y + (petViewportCenter.y - nextPetCenter.y) * factor);
-
-    ignoreLayoutMoveEvents();
-    await currentWindow.setPosition(new PhysicalPosition(nextX, nextY));
   } catch (error) {
     console.info("Pet window resize skipped:", error);
     await currentWindow.setSize(new LogicalSize(nextLayout.width, nextLayout.height));
@@ -973,20 +982,6 @@ function getPetWindowLayout(hasBubble) {
   const height = Math.ceil(petHeight + PET_WINDOW_PADDING + (hasBubble ? 82 : 0));
 
   return { width, height };
-}
-
-function capturePetViewportCenter() {
-  if (!petEl) return null;
-  const rect = petEl.getBoundingClientRect();
-  if (!rect.width || !rect.height) return null;
-  return {
-    x: rect.left + rect.width / 2,
-    y: rect.top + rect.height / 2
-  };
-}
-
-function nextAnimationFrame() {
-  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
 }
 
 function ignoreLayoutMoveEvents() {

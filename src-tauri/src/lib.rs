@@ -5,11 +5,14 @@ use std::{
     env, fs,
     io::{Cursor, Read},
     path::{Path, PathBuf},
+    thread,
+    time::{SystemTime, UNIX_EPOCH},
 };
 use tauri::{
     image::Image, menu::MenuBuilder, tray::TrayIconBuilder, Emitter, Manager, WebviewUrl,
     WebviewWindowBuilder,
 };
+use tiny_http::{Method, Response, Server, StatusCode};
 
 const MAIN_WINDOW_LABEL: &str = "main";
 const SETTINGS_WINDOW_LABEL: &str = "settings";
@@ -21,6 +24,8 @@ const MENU_TOGGLE_PET: &str = "toggle_pet";
 const MENU_QUIT: &str = "quit";
 const HOOK_SOURCE_MARKER: &str = "codex-pet-desk";
 const HOOK_SCRIPT: &str = include_str!("../hooks/codex-pet-hook.cjs");
+const HOOK_SERVER_START_PORT: u16 = 23423;
+const HOOK_SERVER_PORT_ATTEMPTS: u16 = 20;
 const BUILTIN_HACHIROKU_MANIFEST: &str = include_str!("../assets/pets/hachiroku/pet.json");
 const BUILTIN_HACHIROKU_SPRITE: &[u8] = include_bytes!("../assets/pets/hachiroku/spritesheet.webp");
 
@@ -110,6 +115,30 @@ struct HookEvent {
     cwd: String,
     #[serde(default)]
     timestamp: u64,
+}
+
+#[derive(Debug, Deserialize)]
+struct IncomingHookEvent {
+    agent: String,
+    #[serde(default)]
+    event: String,
+    #[serde(default)]
+    data: HookEventData,
+}
+
+#[derive(Debug, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct HookEventData {
+    #[serde(default, alias = "session_title")]
+    session_title: String,
+    #[serde(default)]
+    summary: String,
+    #[serde(default, alias = "tool_name")]
+    tool_name: String,
+    #[serde(default, alias = "working_directory")]
+    working_directory: String,
+    #[serde(default, alias = "needs_attention")]
+    needs_attention: bool,
 }
 
 #[tauri::command]
@@ -228,6 +257,14 @@ fn take_hook_events() -> Result<Vec<HookEvent>, String> {
 }
 
 #[tauri::command]
+fn codex_activity() -> Result<Option<HookEvent>, String> {
+    let Some(session_file) = latest_codex_session_file()? else {
+        return Ok(None);
+    };
+    Ok(read_codex_activity_from_session(&session_file))
+}
+
+#[tauri::command]
 fn fetch_petdex_pets() -> Result<Vec<PetdexPet>, String> {
     let response = reqwest::blocking::Client::builder()
         .user_agent("CodexPetDesk/1.0")
@@ -338,6 +375,399 @@ fn hook_script_path() -> Result<PathBuf, String> {
 
 fn hook_event_file() -> Result<PathBuf, String> {
     Ok(codex_pet_runtime_dir()?.join("hook-events.jsonl"))
+}
+
+fn hook_port_file() -> Result<PathBuf, String> {
+    Ok(codex_pet_runtime_dir()?.join("port"))
+}
+
+fn fallback_hook_port_file() -> PathBuf {
+    env::temp_dir().join("codex-pet-desk-port")
+}
+
+fn start_hook_server(app: tauri::AppHandle) {
+    thread::spawn(move || {
+        let Some((server, port)) = bind_hook_server() else {
+            eprintln!("Codex Pet hook server could not bind a local port.");
+            return;
+        };
+        write_hook_port_files(port);
+
+        for mut request in server.incoming_requests() {
+            match (request.method(), request.url()) {
+                (&Method::Get, "/status") => {
+                    let _ = request.respond(json_response(
+                        StatusCode(200),
+                        json!({ "ok": true, "port": port }),
+                    ));
+                }
+                (&Method::Post, "/event") => {
+                    let response = handle_hook_server_event(&mut request, &app);
+                    let _ = request.respond(response);
+                }
+                _ => {
+                    let _ = request.respond(json_response(
+                        StatusCode(404),
+                        json!({ "error": "not_found" }),
+                    ));
+                }
+            }
+        }
+    });
+}
+
+fn bind_hook_server() -> Option<(Server, u16)> {
+    for port in HOOK_SERVER_START_PORT..(HOOK_SERVER_START_PORT + HOOK_SERVER_PORT_ATTEMPTS) {
+        let address = format!("127.0.0.1:{port}");
+        if let Ok(server) = Server::http(&address) {
+            return Some((server, port));
+        }
+    }
+    None
+}
+
+fn handle_hook_server_event(
+    request: &mut tiny_http::Request,
+    app: &tauri::AppHandle,
+) -> Response<Cursor<Vec<u8>>> {
+    let mut body = String::new();
+    if let Err(error) = request.as_reader().read_to_string(&mut body) {
+        return json_response(
+            StatusCode(400),
+            json!({ "error": format!("failed_to_read_body: {error}") }),
+        );
+    }
+
+    let parsed = match serde_json::from_str::<IncomingHookEvent>(&body) {
+        Ok(value) => value,
+        Err(error) => {
+            return json_response(
+                StatusCode(400),
+                json!({ "error": format!("invalid_json: {error}") }),
+            );
+        }
+    };
+
+    let event = incoming_hook_to_bubble_event(parsed);
+    let _ = app.emit("code-task-complete", event);
+
+    json_response(StatusCode(200), json!({ "ok": true }))
+}
+
+fn incoming_hook_to_bubble_event(event: IncomingHookEvent) -> HookEvent {
+    let event_type = normalize_incoming_event(&event.event, event.data.needs_attention);
+    let title = if event_type == "approval" {
+        "需要审批".to_string()
+    } else {
+        first_line(&event.data.session_title)
+            .or_else(|| first_line(&event.data.summary))
+            .unwrap_or_else(|| format!("{} 任务", format_agent_name(&event.agent)))
+    };
+    let message = if event_type == "complete" {
+        "任务已经完成。".to_string()
+    } else if event_type == "approval" {
+        first_line(&event.data.summary)
+            .or_else(|| first_line(&event.data.tool_name))
+            .unwrap_or_else(|| "有一个操作需要你审批。".to_string())
+    } else {
+        first_line(&event.data.summary)
+            .or_else(|| first_line(&event.data.session_title))
+            .unwrap_or_else(|| "任务正在进行中。".to_string())
+    };
+
+    HookEvent {
+        event_type: String::new(),
+        r#type: event_type,
+        agent: event.agent,
+        title: truncate_text(&title, 72),
+        message: truncate_text(&message, 180),
+        cwd: event.data.working_directory,
+        timestamp: now_millis(),
+    }
+}
+
+fn normalize_incoming_event(event: &str, needs_attention: bool) -> String {
+    let normalized = event.to_lowercase();
+    if needs_attention
+        || matches!(
+            normalized.as_str(),
+            "permission_request" | "approval" | "notification"
+        )
+    {
+        return "approval".to_string();
+    }
+    if matches!(
+        normalized.as_str(),
+        "complete" | "completed" | "session_end" | "sessionend"
+    ) {
+        return "complete".to_string();
+    }
+    "running".to_string()
+}
+
+fn format_agent_name(agent: &str) -> &str {
+    match agent {
+        "codex" => "Codex",
+        "claude-code" => "Claude Code",
+        _ => "Code",
+    }
+}
+
+fn json_response(status: StatusCode, value: Value) -> Response<Cursor<Vec<u8>>> {
+    let body = serde_json::to_vec(&value).unwrap_or_else(|_| b"{}".to_vec());
+    let response = Response::from_data(body).with_status_code(status);
+    response.with_header(
+        "Content-Type: application/json"
+            .parse::<tiny_http::Header>()
+            .expect("valid content-type header"),
+    )
+}
+
+fn write_hook_port_files(port: u16) {
+    if let Ok(path) = hook_port_file() {
+        let _ = write_hook_port_file(&path, port);
+    }
+    let _ = write_hook_port_file(&fallback_hook_port_file(), port);
+}
+
+fn write_hook_port_file(path: &Path, port: u16) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    }
+    fs::write(path, port.to_string()).map_err(|error| error.to_string())
+}
+
+fn now_millis() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as u64)
+        .unwrap_or_default()
+}
+
+fn codex_sessions_dir() -> Result<PathBuf, String> {
+    home_dir()
+        .map(|home| home.join(".codex").join("sessions"))
+        .ok_or_else(|| "Could not find the user home directory.".to_string())
+}
+
+fn latest_codex_session_file() -> Result<Option<PathBuf>, String> {
+    let sessions = codex_sessions_dir()?;
+    if !sessions.exists() {
+        return Ok(None);
+    }
+
+    let mut newest: Option<(PathBuf, SystemTime)> = None;
+    collect_latest_jsonl(&sessions, &mut newest)?;
+    Ok(newest.map(|(path, _)| path))
+}
+
+fn collect_latest_jsonl(
+    dir: &Path,
+    newest: &mut Option<(PathBuf, SystemTime)>,
+) -> Result<(), String> {
+    for entry in fs::read_dir(dir).map_err(|error| error.to_string())? {
+        let entry = entry.map_err(|error| error.to_string())?;
+        let path = entry.path();
+        if path.is_dir() {
+            collect_latest_jsonl(&path, newest)?;
+            continue;
+        }
+        if path.extension().and_then(|value| value.to_str()) != Some("jsonl") {
+            continue;
+        }
+
+        let modified = entry
+            .metadata()
+            .and_then(|metadata| metadata.modified())
+            .unwrap_or(UNIX_EPOCH);
+        if newest
+            .as_ref()
+            .map(|(_, current)| modified > *current)
+            .unwrap_or(true)
+        {
+            *newest = Some((path, modified));
+        }
+    }
+    Ok(())
+}
+
+fn read_codex_activity_from_session(path: &Path) -> Option<HookEvent> {
+    let content = fs::read_to_string(path).ok()?;
+    let mut prompt = String::new();
+    let mut latest_state = String::new();
+    let mut latest_timestamp = String::new();
+    let mut approval_message = String::new();
+
+    for line in content.lines().rev().take(500) {
+        let Ok(value) = serde_json::from_str::<Value>(line) else {
+            continue;
+        };
+        if latest_timestamp.is_empty() {
+            latest_timestamp = value
+                .get("timestamp")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string();
+        }
+
+        let payload = value.get("payload").unwrap_or(&Value::Null);
+        let event_type = payload
+            .get("type")
+            .and_then(Value::as_str)
+            .or_else(|| value.get("type").and_then(Value::as_str))
+            .unwrap_or_default()
+            .to_lowercase();
+
+        if latest_state.is_empty() {
+            if event_type == "task_complete" {
+                latest_state = "complete".to_string();
+            } else if event_type == "task_started" {
+                latest_state = "running".to_string();
+            }
+        }
+
+        if approval_message.is_empty()
+            && (event_type.contains("approval")
+                || event_type.contains("permission")
+                || event_type.contains("request_user_input"))
+        {
+            approval_message = extract_text(payload)
+                .or_else(|| extract_text(&value))
+                .unwrap_or_else(|| "有一个操作需要你审批。".to_string());
+        }
+
+        if prompt.is_empty() {
+            prompt = extract_user_prompt(&value).unwrap_or_default();
+        }
+
+        if !prompt.is_empty() && !latest_state.is_empty() && !approval_message.is_empty() {
+            break;
+        }
+    }
+
+    if latest_state.is_empty() {
+        return None;
+    }
+
+    let event_type = if !approval_message.is_empty() && latest_state != "complete" {
+        "approval"
+    } else {
+        latest_state.as_str()
+    };
+    let title = first_line(&prompt).unwrap_or_else(|| "Codex 任务".to_string());
+    let message = match event_type {
+        "approval" => approval_message,
+        "complete" => "任务已经完成。".to_string(),
+        _ => prompt.clone(),
+    };
+
+    Some(HookEvent {
+        event_type: String::new(),
+        r#type: event_type.to_string(),
+        agent: "codex".to_string(),
+        title: truncate_text(&title, 72),
+        message: truncate_text(&message, 180),
+        cwd: String::new(),
+        timestamp: stable_timestamp(&latest_timestamp),
+    })
+}
+
+fn extract_user_prompt(value: &Value) -> Option<String> {
+    let payload = value.get("payload").unwrap_or(value);
+    if payload.get("role").and_then(Value::as_str) == Some("user") {
+        return extract_text(payload);
+    }
+
+    for key in ["user_message", "userMessage", "prompt", "message"] {
+        if let Some(text) = payload.get(key).and_then(Value::as_str) {
+            if !text.trim().is_empty() {
+                return Some(text.trim().to_string());
+            }
+        }
+    }
+
+    extract_user_text_recursive(payload)
+}
+
+fn extract_user_text_recursive(value: &Value) -> Option<String> {
+    match value {
+        Value::Object(map) => {
+            if map.get("role").and_then(Value::as_str) == Some("user") {
+                return extract_text(value);
+            }
+            if matches!(
+                map.get("type").and_then(Value::as_str),
+                Some("input_text" | "text")
+            ) {
+                return extract_text(value);
+            }
+            for child in map.values() {
+                if let Some(text) = extract_user_text_recursive(child) {
+                    return Some(text);
+                }
+            }
+            None
+        }
+        Value::Array(items) => items.iter().find_map(extract_user_text_recursive),
+        _ => None,
+    }
+}
+
+fn extract_text(value: &Value) -> Option<String> {
+    if let Some(text) = value
+        .as_str()
+        .map(str::trim)
+        .filter(|text| !text.is_empty())
+    {
+        return Some(text.to_string());
+    }
+    if let Some(text) = value.get("text").and_then(Value::as_str) {
+        if !text.trim().is_empty() {
+            return Some(text.trim().to_string());
+        }
+    }
+    if let Some(content) = value.get("content") {
+        match content {
+            Value::String(text) => {
+                if !text.trim().is_empty() {
+                    return Some(text.trim().to_string());
+                }
+            }
+            Value::Array(items) => {
+                let parts: Vec<String> = items.iter().filter_map(extract_text).collect();
+                if !parts.is_empty() {
+                    return Some(parts.join("\n"));
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+fn first_line(value: &str) -> Option<String> {
+    value
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .map(ToString::to_string)
+}
+
+fn stable_timestamp(value: &str) -> u64 {
+    value.bytes().fold(0u64, |hash, byte| {
+        hash.wrapping_mul(31).wrapping_add(u64::from(byte))
+    })
+}
+
+fn truncate_text(value: &str, limit: usize) -> String {
+    let mut output = String::new();
+    for character in value.chars().take(limit) {
+        output.push(character);
+    }
+    if value.chars().count() > limit {
+        output.push_str("...");
+    }
+    output
 }
 
 fn codex_config_path() -> Result<PathBuf, String> {
@@ -755,6 +1185,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             create_tray(app.handle())?;
+            start_hook_server(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -765,6 +1196,7 @@ pub fn run() {
             install_code_hooks,
             install_petdex_pet,
             list_codex_pets,
+            codex_activity,
             test_hook_bubble,
             take_hook_events
         ])

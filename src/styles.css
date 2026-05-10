@@ -38,10 +38,14 @@ input {
   padding: 0;
 }
 
-.shell--pet.has-bubble .pet-stage {
+.shell--pet .pet-stage {
   align-content: end;
-  padding-top: 76px;
+  justify-content: center;
   padding-bottom: 4px;
+}
+
+.shell--pet.has-bubble .pet-stage {
+  padding-top: 76px;
 }
 
 .shell--settings {
