@@ -97,6 +97,7 @@ let speechBubbleTimer = 0;
 let hookPollTimer = 0;
 let windowLayoutMoveTimer = 0;
 let currentPetWindowLayout = null;
+let speechBubbleRequestId = 0;
 let lastCodexActivityKey = "";
 
 appEl.classList.toggle("shell--settings", isSettingsWindow);
@@ -718,24 +719,36 @@ function formatHookAgent(agent) {
   return "Code";
 }
 
-function showSpeechBubble({ title = "", message = "", state = "waving", timeout = 8500 } = {}) {
+function showSpeechBubble(options = {}) {
+  void showSpeechBubbleAsync(options);
+}
+
+async function showSpeechBubbleAsync({ title = "", message = "", state = "waving", timeout = 8500 } = {}) {
   if (isSettingsWindow || !speechBubbleEl) return;
+  const requestId = ++speechBubbleRequestId;
   speechBubbleEl.innerHTML = `
     <strong>${escapeText(title)}</strong>
     <span>${escapeText(message)}</span>
   `;
+  await resizePetWindowToLayout({ keepPetAnchored: true, hasBubble: true });
+  if (requestId !== speechBubbleRequestId) return;
   appEl.classList.add("has-bubble");
   setState(state);
   window.clearTimeout(speechBubbleTimer);
   speechBubbleTimer = window.setTimeout(hideSpeechBubble, timeout);
-  resizePetWindow({ keepPetAnchored: true });
 }
 
 function hideSpeechBubble() {
+  void hideSpeechBubbleAsync();
+}
+
+async function hideSpeechBubbleAsync() {
+  const requestId = ++speechBubbleRequestId;
   appEl.classList.remove("has-bubble");
   if (speechBubbleEl) speechBubbleEl.textContent = "";
   if (!isPetHovered) setState("idle");
-  resizePetWindow({ keepPetAnchored: true });
+  await resizePetWindowToLayout({ keepPetAnchored: true, hasBubble: false });
+  if (requestId !== speechBubbleRequestId) return;
 }
 
 async function checkForUpdates({ manual = false } = {}) {
@@ -948,11 +961,11 @@ function resizePetWindow(options = {}) {
   void resizePetWindowToLayout(options);
 }
 
-async function resizePetWindowToLayout({ keepPetAnchored = false } = {}) {
+async function resizePetWindowToLayout({ keepPetAnchored = false, hasBubble = null } = {}) {
   if (isSettingsWindow || !currentWindow || !LogicalSize) return;
 
-  const nextLayout = getPetWindowLayout(appEl.classList.contains("has-bubble"));
-  const previousLayout = currentPetWindowLayout;
+  const nextLayout = getPetWindowLayout(hasBubble ?? appEl.classList.contains("has-bubble"));
+  const previousLayout = currentPetWindowLayout ?? (keepPetAnchored ? getPetWindowLayout(false) : null);
   currentPetWindowLayout = nextLayout;
 
   try {
