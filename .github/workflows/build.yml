@@ -222,7 +222,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="codex-pet-desk-v${RELEASE_VERSION}"
-          gh release delete "$TAG" --yes --cleanup-tag || true
+          gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag || true
           gh release create "$TAG" release-upload/* \
+            --repo "$GITHUB_REPOSITORY" \
             --title "Codex Pet Desk v${RELEASE_VERSION}" \
             --notes "Automated full build from ${GITHUB_SHA}."
