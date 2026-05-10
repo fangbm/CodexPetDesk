@@ -175,6 +175,8 @@ petPageButtons.forEach((button) => {
 petMenuSettingsEl?.addEventListener("click", () => runPetMenuAction("open_settings_window"));
 petMenuPetsEl?.addEventListener("click", () => runPetMenuAction("open_pets_window"));
 petMenuHideEl?.addEventListener("click", () => runPetMenuAction("hide_pet_window"));
+petContextMenuEl?.addEventListener("mousedown", (event) => event.stopPropagation());
+petContextMenuEl?.addEventListener("pointerdown", (event) => event.stopPropagation());
 
 petEl.addEventListener("click", () => {
   if (!petEl.classList.contains("is-loaded")) return;
@@ -206,11 +208,8 @@ document.addEventListener("mousedown", async (event) => {
   await currentWindow?.startDragging();
 });
 
-document.addEventListener("contextmenu", (event) => {
-  if (isSettingsWindow) return;
-  event.preventDefault();
-  showPetContextMenu(event.clientX, event.clientY);
-});
+window.addEventListener("contextmenu", handlePetContextMenu, { capture: true });
+window.addEventListener("auxclick", handlePetAuxClick, { capture: true });
 
 document.addEventListener("pointerdown", (event) => {
   if (isSettingsWindow || petContextMenuEl?.hidden) return;
@@ -423,6 +422,19 @@ function setSettingsPage(page) {
       : "管理桌宠、更新、存储位置和 Codex 提醒。";
   }
   if (page === "pets") loadPetdexPets();
+}
+
+function handlePetContextMenu(event) {
+  if (isSettingsWindow) return;
+  event.preventDefault();
+  event.stopPropagation();
+  showPetContextMenu(event.clientX, event.clientY);
+}
+
+function handlePetAuxClick(event) {
+  if (isSettingsWindow || event.button !== 1) return;
+  event.preventDefault();
+  event.stopPropagation();
 }
 
 function showPetContextMenu(x, y) {

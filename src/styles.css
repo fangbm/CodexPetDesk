@@ -136,6 +136,10 @@ input {
   display: none;
 }
 
+.shell--settings .pet-context-menu {
+  display: none;
+}
+
 .pet-context-menu button {
   display: flex;
   align-items: center;
@@ -630,7 +634,7 @@ body.is-dragging .panel {
 }
 
 .shell--settings .panel {
-  grid-template-columns: 154px minmax(0, 1fr);
+  grid-template-columns: 150px minmax(0, 1fr);
   gap: 0;
   width: 100%;
   height: 100%;
@@ -738,7 +742,7 @@ body.is-dragging .panel {
   gap: 14px;
   min-width: 0;
   min-height: 0;
-  padding: 22px 28px;
+  padding: 20px 24px;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-color: #c8d1e2 transparent;
@@ -854,7 +858,7 @@ body.is-dragging .panel {
 }
 
 .settings-page[data-page="settings"].is-active {
-  grid-template-columns: minmax(0, 1.2fr) minmax(220px, 0.8fr);
+  grid-template-columns: minmax(0, 1fr) minmax(210px, 0.8fr);
   gap: 12px;
   align-items: stretch;
 }
@@ -867,7 +871,7 @@ body.is-dragging .panel {
 .settings-card {
   gap: 16px;
   min-width: 0;
-  padding: 18px;
+  padding: 16px;
   border: 1px solid #e4e9f2;
   border-radius: 8px;
   background: #fff;
@@ -930,7 +934,7 @@ body.is-dragging .panel {
 
 .shell--settings .scale-control,
 .shell--settings .storage-control {
-  grid-template-columns: 84px minmax(0, 1fr);
+  grid-template-columns: 78px minmax(0, 1fr);
   color: #344054;
   font-size: 13px;
 }
@@ -953,13 +957,20 @@ body.is-dragging .panel {
 
 .shell--settings .file-button,
 .shell--settings .primary-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   height: 36px;
+  min-width: 0;
+  padding: 0 10px;
   border: 1px solid #dce3ee;
   border-radius: 7px;
   color: #344054;
   background: #fff;
   font-size: 13px;
   font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
 }
 
 .shell--settings .file-button:hover,
@@ -982,6 +993,11 @@ body.is-dragging .panel {
 
 .shell--settings .toggle-row {
   grid-template-columns: minmax(0, 1fr) auto;
+  min-width: 0;
+}
+
+.shell--settings .toggle-row span {
+  min-width: 0;
 }
 
 .shell--settings .toggle-row strong {
