@@ -21,6 +21,8 @@ const MENU_TOGGLE_PET: &str = "toggle_pet";
 const MENU_QUIT: &str = "quit";
 const HOOK_SOURCE_MARKER: &str = "codex-pet-desk";
 const HOOK_SCRIPT: &str = include_str!("../hooks/codex-pet-hook.cjs");
+const BUILTIN_HACHIROKU_MANIFEST: &str = include_str!("../assets/pets/hachiroku/pet.json");
+const BUILTIN_HACHIROKU_SPRITE: &[u8] = include_bytes!("../assets/pets/hachiroku/spritesheet.webp");
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -146,6 +148,32 @@ fn list_codex_pets(pets_dir: Option<String>) -> Result<Vec<NativePet>, String> {
 #[tauri::command]
 fn default_pet_storage_dir() -> Result<String, String> {
     codex_pets_dir().map(|path| path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn default_builtin_pet() -> Result<NativePet, String> {
+    let manifest: PetManifest =
+        serde_json::from_str(BUILTIN_HACHIROKU_MANIFEST).map_err(|error| error.to_string())?;
+    let id = manifest.id.unwrap_or_else(|| "hachiroku".to_string());
+    let display_name = manifest
+        .display_name
+        .unwrap_or_else(|| "Hachiroku".to_string());
+    let description = manifest.description.unwrap_or_else(|| {
+        "A chibi pixel Hachiroku companion in a black railway conductor uniform.".to_string()
+    });
+    let spritesheet_path = manifest
+        .spritesheet_path
+        .unwrap_or_else(|| "spritesheet.webp".to_string());
+    let encoded = base64::engine::general_purpose::STANDARD.encode(BUILTIN_HACHIROKU_SPRITE);
+
+    Ok(NativePet {
+        id,
+        display_name,
+        description,
+        spritesheet_path,
+        source_dir: "builtin:hachiroku".to_string(),
+        sprite_data_url: format!("data:image/webp;base64,{encoded}"),
+    })
 }
 
 #[tauri::command]
@@ -730,6 +758,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            default_builtin_pet,
             default_pet_storage_dir,
             fetch_petdex_pets,
             hook_status,

@@ -36,9 +36,9 @@ const STATES = {
 };
 
 const SAMPLE_PET = {
-  id: "sample",
-  displayName: "Codex Pet",
-  description: "Load a Codex-compatible pet package to begin."
+  id: "hachiroku",
+  displayName: "Hachiroku",
+  description: "A chibi pixel Hachiroku companion in a black railway conductor uniform."
 };
 
 const appEl = document.querySelector("#app");
@@ -266,6 +266,7 @@ async function initializeTauriRuntime() {
   defaultPetStorageDir = await tauri.invoke("default_pet_storage_dir");
   if (!petStorageDir) petStorageDir = defaultPetStorageDir;
   renderPetStorageDir();
+  await loadBuiltinDefaultPet(tauri.invoke);
   resizePetWindow();
 
   await tauri.listen("active-pet-changed", (event) => {
@@ -319,9 +320,19 @@ async function loadInstalledPets(invoke) {
   renderPetdexPets();
   if (!installedPets.length) return;
 
-  const currentStillExists = installedPets.some((pet) => pet.id === currentPet.id);
-  if (currentPet === SAMPLE_PET || !currentStillExists) {
+  if (currentPet === SAMPLE_PET) {
     loadNativePet(installedPets[0]);
+  }
+}
+
+async function loadBuiltinDefaultPet(invoke) {
+  if (!invoke) return;
+
+  try {
+    const pet = await invoke("default_builtin_pet");
+    loadNativePet(pet);
+  } catch (error) {
+    console.info("Builtin default pet unavailable:", error);
   }
 }
 
