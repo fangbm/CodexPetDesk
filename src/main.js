@@ -6,7 +6,6 @@ const COLUMNS = 8;
 const ROWS = 9;
 const PET_WINDOW_PADDING = 16;
 const BUBBLE_WINDOW_WIDTH = 276;
-const BUBBLE_STAGE_BOTTOM_PADDING = 4;
 const MIN_SCALE = 0.6;
 const MAX_SCALE = 2;
 const WHEEL_SCALE_STEP = 0.08;
@@ -96,7 +95,6 @@ let petStorageDir = localStorage.getItem(PET_STORAGE_DIR_KEY) || "";
 let petdexPets = [];
 let speechBubbleTimer = 0;
 let hookPollTimer = 0;
-let lastPetWindowLayout = null;
 let windowLayoutMoveTimer = 0;
 
 appEl.classList.toggle("shell--settings", isSettingsWindow);
@@ -152,7 +150,10 @@ resetStorageEl.addEventListener("click", async () => {
   await loadInstalledPets(invokeCommand);
 });
 
-petdexSearchEl.addEventListener("input", renderPetdexPets);
+petdexSearchEl.addEventListener("input", () => {
+  renderLocalPets();
+  renderPetdexPets();
+});
 
 tabButtons.forEach((button) => {
   button.addEventListener("click", () => setSettingsPage(button.dataset.page));
@@ -424,11 +425,10 @@ async function loadPetdexPets({ force = false } = {}) {
 }
 
 function renderPetdexPets() {
-  const query = petdexSearchEl.value.trim().toLowerCase();
+  const query = getPetSearchQuery();
   const shown = petdexPets
     .filter((pet) => {
-      const haystack = [pet.displayName, pet.slug, pet.kind, pet.submittedBy].filter(Boolean).join(" ").toLowerCase();
-      return !query || haystack.includes(query);
+      return matchesPetSearch(query, [pet.displayName, pet.slug, pet.kind, pet.submittedBy]);
     })
     .slice(0, 60);
 
@@ -443,9 +443,14 @@ function renderPetdexPets() {
 
 function renderLocalPets() {
   if (!localPetListEl) return;
-  localPetListEl.innerHTML = installedPets.length
-    ? installedPets.map(renderLocalPetCard).join("")
-    : '<div class="empty-state">No local pets found in the selected folder.</div>';
+  const query = getPetSearchQuery();
+  const shown = installedPets.filter((pet) => {
+    return matchesPetSearch(query, [pet.displayName, pet.description, pet.id, pet.sourceDir]);
+  });
+
+  localPetListEl.innerHTML = shown.length
+    ? shown.map(renderLocalPetCard).join("")
+    : `<div class="empty-state">${query ? "No matching local pets." : "No local pets found in the selected folder."}</div>`;
 
   localPetListEl.querySelectorAll("[data-use-pet]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -453,6 +458,19 @@ function renderLocalPets() {
       if (pet) loadNativePet(pet);
     });
   });
+}
+
+function getPetSearchQuery() {
+  return petdexSearchEl.value.trim().toLowerCase();
+}
+
+function matchesPetSearch(query, values) {
+  if (!query) return true;
+  return values
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+    .includes(query);
 }
 
 function renderLocalPetCard(pet) {
@@ -688,6 +706,7 @@ function formatHookAgent(agent) {
 
 function showSpeechBubble({ title = "", message = "", state = "waving", timeout = 8500 } = {}) {
   if (isSettingsWindow || !speechBubbleEl) return;
+  const petViewportCenter = capturePetViewportCenter();
   speechBubbleEl.innerHTML = `
     <strong>${escapeText(title)}</strong>
     <span>${escapeText(message)}</span>
@@ -696,14 +715,15 @@ function showSpeechBubble({ title = "", message = "", state = "waving", timeout 
   setState(state);
   window.clearTimeout(speechBubbleTimer);
   speechBubbleTimer = window.setTimeout(hideSpeechBubble, timeout);
-  resizePetWindow();
+  resizePetWindow({ petViewportCenter });
 }
 
 function hideSpeechBubble() {
+  const petViewportCenter = capturePetViewportCenter();
   appEl.classList.remove("has-bubble");
   if (speechBubbleEl) speechBubbleEl.textContent = "";
   if (!isPetHovered) setState("idle");
-  resizePetWindow();
+  resizePetWindow({ petViewportCenter });
 }
 
 async function checkForUpdates({ manual = false } = {}) {
@@ -912,37 +932,32 @@ function updateScale(nextScale, broadcast = true) {
   if (broadcast) emitEvent?.("pet-scale-changed", scale);
 }
 
-function resizePetWindow() {
-  void resizePetWindowToLayout();
+function resizePetWindow(options = {}) {
+  void resizePetWindowToLayout(options);
 }
 
-async function resizePetWindowToLayout() {
+async function resizePetWindowToLayout({ petViewportCenter = null } = {}) {
   if (isSettingsWindow || !currentWindow || !LogicalSize) return;
 
   const nextLayout = getPetWindowLayout(appEl.classList.contains("has-bubble"));
-  const previousLayout = lastPetWindowLayout;
-  lastPetWindowLayout = nextLayout;
-
-  if (!previousLayout || !PhysicalPosition) {
-    await currentWindow.setSize(new LogicalSize(nextLayout.width, nextLayout.height));
-    return;
-  }
 
   try {
+    await currentWindow.setSize(new LogicalSize(nextLayout.width, nextLayout.height));
+    if (!petViewportCenter || !PhysicalPosition) return;
+
+    await nextAnimationFrame();
+    const nextPetCenter = capturePetViewportCenter();
+    if (!nextPetCenter) return;
+
     const [position, scaleFactor] = await Promise.all([
       currentWindow.outerPosition(),
       currentWindow.scaleFactor?.() ?? Promise.resolve(1)
     ]);
     const factor = Number.isFinite(scaleFactor) && scaleFactor > 0 ? scaleFactor : 1;
-    const nextX = Math.round(position.x + (previousLayout.petCenterX - nextLayout.petCenterX) * factor);
-    const nextY = Math.round(position.y + (previousLayout.petCenterY - nextLayout.petCenterY) * factor);
+    const nextX = Math.round(position.x + (petViewportCenter.x - nextPetCenter.x) * factor);
+    const nextY = Math.round(position.y + (petViewportCenter.y - nextPetCenter.y) * factor);
 
-    window.clearTimeout(windowLayoutMoveTimer);
-    windowLayoutMoveTimer = window.setTimeout(() => {
-      windowLayoutMoveTimer = 0;
-    }, 120);
-
-    await currentWindow.setSize(new LogicalSize(nextLayout.width, nextLayout.height));
+    ignoreLayoutMoveEvents();
     await currentWindow.setPosition(new PhysicalPosition(nextX, nextY));
   } catch (error) {
     console.info("Pet window resize skipped:", error);
@@ -956,14 +971,29 @@ function getPetWindowLayout(hasBubble) {
   const baseWidth = petWidth + PET_WINDOW_PADDING;
   const width = Math.ceil(hasBubble ? Math.max(baseWidth, BUBBLE_WINDOW_WIDTH) : baseWidth);
   const height = Math.ceil(petHeight + PET_WINDOW_PADDING + (hasBubble ? 82 : 0));
-  const petOffsetX = (width - petWidth) / 2;
-  const petOffsetY = hasBubble
-    ? height - BUBBLE_STAGE_BOTTOM_PADDING - petHeight
-    : (height - petHeight) / 2;
-  const petCenterX = petOffsetX + petWidth / 2;
-  const petCenterY = petOffsetY + petHeight / 2;
 
-  return { width, height, petCenterX, petCenterY };
+  return { width, height };
+}
+
+function capturePetViewportCenter() {
+  if (!petEl) return null;
+  const rect = petEl.getBoundingClientRect();
+  if (!rect.width || !rect.height) return null;
+  return {
+    x: rect.left + rect.width / 2,
+    y: rect.top + rect.height / 2
+  };
+}
+
+function nextAnimationFrame() {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+}
+
+function ignoreLayoutMoveEvents() {
+  window.clearTimeout(windowLayoutMoveTimer);
+  windowLayoutMoveTimer = window.setTimeout(() => {
+    windowLayoutMoveTimer = 0;
+  }, 160);
 }
 
 function readFileAsDataUrl(file) {
