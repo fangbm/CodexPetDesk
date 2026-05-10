@@ -37,8 +37,10 @@ input {
 }
 
 .shell--settings {
-  grid-template-rows: minmax(170px, 0.9fr) auto;
+  grid-template-rows: minmax(120px, 0.48fr) minmax(0, 1fr);
+  min-height: 0;
   padding: 14px;
+  overflow: hidden;
   background:
     radial-gradient(circle at 20% 0%, rgb(85 223 178 / 0.16), transparent 34%),
     linear-gradient(145deg, #11171a, #171316 58%, #121717);
@@ -49,7 +51,8 @@ input {
 }
 
 .shell--settings .pet-stage {
-  min-height: 168px;
+  min-height: 120px;
+  height: auto;
 }
 
 .pet-stage {
@@ -99,6 +102,30 @@ input {
   box-shadow: 0 18px 46px rgb(0 0 0 / 0.34);
   backdrop-filter: blur(16px);
   transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.shell--settings .panel {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: rgb(85 223 178 / 0.55) rgb(255 255 255 / 0.06);
+  scrollbar-width: thin;
+}
+
+.shell--settings .panel::-webkit-scrollbar {
+  width: 8px;
+}
+
+.shell--settings .panel::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.06);
+}
+
+.shell--settings .panel::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgb(85 223 178 / 0.55);
+  background-clip: padding-box;
 }
 
 .panel.is-hidden {
