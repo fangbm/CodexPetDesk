@@ -696,7 +696,7 @@ body.is-dragging .panel {
 
 .settings-main {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 14px;
   min-width: 0;
   min-height: 0;
@@ -722,7 +722,7 @@ body.is-dragging .panel {
   position: static;
   z-index: auto;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(180px, 250px);
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   align-items: start;
   margin: 0;

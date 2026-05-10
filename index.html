@@ -41,39 +41,20 @@
         <div class="settings-main">
           <div class="settings-header">
             <div>
-              <h1>设置</h1>
-              <p>管理桌宠、更新、存储位置和 Codex 提醒。</p>
+              <h1 id="settings-title">设置</h1>
+              <p id="settings-subtitle">管理桌宠、更新、存储位置和 Codex 提醒。</p>
             </div>
-            <label class="settings-search">
-              <span>搜索</span>
-              <input type="search" placeholder="搜索设置项..." />
-            </label>
-          </div>
-
-          <div class="settings-tabs settings-category-tabs" role="tablist" aria-label="Settings categories">
-            <button class="tab-button is-active" type="button">基本设置</button>
-            <button class="tab-button" type="button">更新</button>
-            <button class="tab-button" type="button">Code Hooks</button>
-            <button class="tab-button" type="button">存储</button>
           </div>
 
           <div class="settings-page is-active" data-page="settings">
-            <section class="settings-section settings-card settings-card--wide">
-              <div class="section-title">桌宠设置</div>
-              <div class="pet-settings-grid">
-                <div class="settings-pet-preview">
-                  <div class="preview-orb"></div>
-                  <strong>当前桌宠</strong>
-                  <span id="pet-description" class="pet-description">Adjust how the desktop pet behaves.</span>
-                </div>
-                <div class="settings-form">
-                  <label class="scale-control">
-                    <span>大小</span>
-                    <input id="scale" type="range" min="0.6" max="2" step="0.05" value="1" />
-                  </label>
-                  <div class="setting-hint">按住 Ctrl 并滚动鼠标滚轮也可以调整桌宠大小。</div>
-                </div>
-              </div>
+            <section class="settings-section settings-card">
+              <div class="section-title">基础设置</div>
+              <label class="scale-control">
+                <span>桌宠大小</span>
+                <input id="scale" type="range" min="0.6" max="2" step="0.05" value="1" />
+              </label>
+              <span id="pet-description" class="pet-description">Adjust how the desktop pet behaves.</span>
+              <div class="setting-hint">按住 Ctrl 并滚动鼠标滚轮也可以调整桌宠大小。</div>
             </section>
 
             <section class="settings-section settings-card">

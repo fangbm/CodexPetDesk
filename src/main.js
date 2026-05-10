@@ -50,6 +50,8 @@ const folderInputEl = document.querySelector("#folder-input");
 const scaleEl = document.querySelector("#scale");
 const petDescriptionEl = document.querySelector("#pet-description");
 const appVersionEl = document.querySelector("#app-version");
+const settingsTitleEl = document.querySelector("#settings-title");
+const settingsSubtitleEl = document.querySelector("#settings-subtitle");
 const speechBubbleEl = document.querySelector("#speech-bubble");
 const startupUpdateCheckEl = document.querySelector("#startup-update-check");
 const checkUpdateEl = document.querySelector("#check-update");
@@ -390,6 +392,13 @@ async function getTauriApi() {
 function setSettingsPage(page) {
   tabButtons.forEach((button) => button.classList.toggle("is-active", button.dataset.page === page));
   pageEls.forEach((pageEl) => pageEl.classList.toggle("is-active", pageEl.dataset.page === page));
+  if (settingsTitleEl && settingsSubtitleEl) {
+    const isPetsPage = page === "pets";
+    settingsTitleEl.textContent = isPetsPage ? "宠物" : "设置";
+    settingsSubtitleEl.textContent = isPetsPage
+      ? "管理本地宠物，浏览 Petdex 并一键安装。"
+      : "管理桌宠、更新、存储位置和 Codex 提醒。";
+  }
   if (page === "pets") loadPetdexPets();
 }
 
