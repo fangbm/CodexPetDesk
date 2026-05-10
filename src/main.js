@@ -9,6 +9,7 @@ const MIN_SCALE = 0.6;
 const MAX_SCALE = 2;
 const WHEEL_SCALE_STEP = 0.08;
 const STARTUP_UPDATE_CHECK_KEY = "codex-pet-desk.check-updates-on-startup";
+const PET_STORAGE_DIR_KEY = "codex-pet-desk.pet-storage-dir";
 const UPDATE_CHECK_TIMEOUT = 20000;
 const UPDATE_PROXY_CANDIDATES = [
   "http://127.0.0.1:7890",
@@ -48,7 +49,17 @@ const appVersionEl = document.querySelector("#app-version");
 const startupUpdateCheckEl = document.querySelector("#startup-update-check");
 const checkUpdateEl = document.querySelector("#check-update");
 const updateStatusEl = document.querySelector("#update-status");
+const petStoragePathEl = document.querySelector("#pet-storage-path");
+const chooseStorageEl = document.querySelector("#choose-storage");
+const resetStorageEl = document.querySelector("#reset-storage");
+const petdexSearchEl = document.querySelector("#petdex-search");
+const petdexStatusEl = document.querySelector("#petdex-status");
+const petdexListEl = document.querySelector("#petdex-list");
+const refreshPetdexEl = document.querySelector("#refresh-petdex");
+const openPetdexEl = document.querySelector("#open-petdex");
 const stateButtons = [...document.querySelectorAll(".state-button")];
+const tabButtons = [...document.querySelectorAll(".tab-button")];
+const pageEls = [...document.querySelectorAll(".settings-page")];
 
 let currentPet = SAMPLE_PET;
 let installedPets = [];
@@ -62,10 +73,15 @@ let loadedObjectUrl = "";
 let currentWindow = null;
 let LogicalSize = null;
 let emitEvent = null;
+let invokeCommand = null;
+let openDialog = null;
 let isPetHovered = false;
 let lastWindowX = null;
 let movementSettleTimer = 0;
 let appVersion = "0.1.0";
+let defaultPetStorageDir = "";
+let petStorageDir = localStorage.getItem(PET_STORAGE_DIR_KEY) || "";
+let petdexPets = [];
 
 appEl.classList.toggle("shell--settings", isSettingsWindow);
 appEl.classList.toggle("shell--pet", !isSettingsWindow);
@@ -99,6 +115,22 @@ startupUpdateCheckEl.addEventListener("change", () => {
 
 checkUpdateEl.addEventListener("click", () => {
   checkForUpdates({ manual: true });
+});
+
+chooseStorageEl.addEventListener("click", choosePetStorageDir);
+resetStorageEl.addEventListener("click", async () => {
+  localStorage.removeItem(PET_STORAGE_DIR_KEY);
+  petStorageDir = defaultPetStorageDir;
+  renderPetStorageDir();
+  await loadInstalledPets(invokeCommand);
+});
+
+refreshPetdexEl.addEventListener("click", () => loadPetdexPets({ force: true }));
+openPetdexEl.addEventListener("click", () => window.open("https://petdex.crafter.run", "_blank"));
+petdexSearchEl.addEventListener("input", renderPetdexPets);
+
+tabButtons.forEach((button) => {
+  button.addEventListener("click", () => setSettingsPage(button.dataset.page));
 });
 
 petEl.addEventListener("click", () => {
@@ -193,6 +225,7 @@ async function initializeTauriRuntime() {
   const tauri = await getTauriApi();
   if (!tauri) {
     setAppVersion("Browser preview");
+    setPetdexStatus("Petdex install is available in the desktop app.");
     panelEl.hidden = !isSettingsWindow;
     return;
   }
@@ -200,8 +233,13 @@ async function initializeTauriRuntime() {
   currentWindow = tauri.currentWindow;
   LogicalSize = tauri.LogicalSize;
   emitEvent = tauri.emit;
+  invokeCommand = tauri.invoke;
+  openDialog = tauri.openDialog;
   appVersion = await tauri.getVersion();
   setAppVersion(`Version ${appVersion}`);
+  defaultPetStorageDir = await tauri.invoke("default_pet_storage_dir");
+  if (!petStorageDir) petStorageDir = defaultPetStorageDir;
+  renderPetStorageDir();
   resizePetWindow();
 
   await tauri.listen("active-pet-changed", (event) => {
@@ -229,6 +267,7 @@ async function initializeTauriRuntime() {
   }
 
   await loadInstalledPets(tauri.invoke);
+  if (isSettingsWindow) loadPetdexPets();
   panelEl.hidden = !isSettingsWindow;
 }
 
@@ -236,18 +275,17 @@ async function loadInstalledPets(invoke) {
   if (!invoke) return;
 
   try {
-    installedPets = await invoke("list_codex_pets");
+    installedPets = await invoke("list_codex_pets", { petsDir: petStorageDir || null });
   } catch (error) {
     showSettingsMessage(String(error));
     return;
   }
 
-  if (!installedPets.length) return;
-  nativePetsEl.classList.remove("is-hidden");
-  nativePetSelectEl.innerHTML = installedPets
-    .map((pet) => `<option value="${escapeAttribute(pet.id)}">${escapeText(pet.displayName)}</option>`)
-    .join("");
-  loadNativePet(installedPets[0]);
+  nativePetsEl.classList.toggle("is-hidden", !installedPets.length);
+  nativePetSelectEl.innerHTML = installedPets.length
+    ? installedPets.map((pet) => `<option value="${escapeAttribute(pet.id)}">${escapeText(pet.displayName)}</option>`).join("")
+    : '<option value="">No installed pets found</option>';
+  if (installedPets.length) loadNativePet(installedPets[0]);
 }
 
 function loadNativePet(pet) {
@@ -265,16 +303,117 @@ function loadNativePet(pet) {
 async function getTauriApi() {
   if (!("__TAURI_INTERNALS__" in window)) return null;
   try {
-    const [{ invoke }, { listen, emit }, { getCurrentWindow, LogicalSize: TauriLogicalSize }, { getVersion }] = await Promise.all([
+    const [{ invoke }, { listen, emit }, { getCurrentWindow, LogicalSize: TauriLogicalSize }, { getVersion }, { open: openDialog }] = await Promise.all([
       import("@tauri-apps/api/core"),
       import("@tauri-apps/api/event"),
       import("@tauri-apps/api/window"),
-      import("@tauri-apps/api/app")
+      import("@tauri-apps/api/app"),
+      import("@tauri-apps/plugin-dialog")
     ]);
-    return { invoke, listen, emit, getVersion, currentWindow: getCurrentWindow(), LogicalSize: TauriLogicalSize };
+    return { invoke, listen, emit, getVersion, openDialog, currentWindow: getCurrentWindow(), LogicalSize: TauriLogicalSize };
   } catch {
     return null;
   }
+}
+
+function setSettingsPage(page) {
+  tabButtons.forEach((button) => button.classList.toggle("is-active", button.dataset.page === page));
+  pageEls.forEach((pageEl) => pageEl.classList.toggle("is-active", pageEl.dataset.page === page));
+}
+
+function renderPetStorageDir() {
+  petStoragePathEl.value = petStorageDir || defaultPetStorageDir || "";
+}
+
+async function choosePetStorageDir() {
+  if (!openDialog) return;
+  const selected = await openDialog({ directory: true, multiple: false, defaultPath: petStorageDir || defaultPetStorageDir });
+  if (!selected) return;
+  petStorageDir = String(selected);
+  localStorage.setItem(PET_STORAGE_DIR_KEY, petStorageDir);
+  renderPetStorageDir();
+  await loadInstalledPets(invokeCommand);
+}
+
+async function loadPetdexPets({ force = false } = {}) {
+  if (!invokeCommand) return;
+  if (petdexPets.length && !force) return;
+
+  setPetdexStatus("Loading Petdex...");
+  refreshPetdexEl.disabled = true;
+  try {
+    petdexPets = await invokeCommand("fetch_petdex_pets");
+    setPetdexStatus(`${petdexPets.length} pets found.`);
+    renderPetdexPets();
+  } catch (error) {
+    setPetdexStatus(`Petdex load failed: ${error}`);
+  } finally {
+    refreshPetdexEl.disabled = false;
+  }
+}
+
+function renderPetdexPets() {
+  const query = petdexSearchEl.value.trim().toLowerCase();
+  const shown = petdexPets
+    .filter((pet) => {
+      const haystack = [pet.displayName, pet.slug, pet.kind, pet.submittedBy].filter(Boolean).join(" ").toLowerCase();
+      return !query || haystack.includes(query);
+    })
+    .slice(0, 60);
+
+  petdexListEl.innerHTML = shown.length
+    ? shown.map(renderPetdexPetCard).join("")
+    : '<div class="empty-state">No matching Petdex pets.</div>';
+
+  petdexListEl.querySelectorAll("[data-install-pet]").forEach((button) => {
+    button.addEventListener("click", () => installPetdexPet(button.dataset.installPet));
+  });
+}
+
+function renderPetdexPetCard(pet) {
+  return `
+    <article class="petdex-card">
+      <div class="petdex-thumb" style="--sprite-url: url('${escapeAttribute(pet.spritesheetUrl || "")}')"></div>
+      <div class="petdex-card-body">
+        <strong>${escapeText(pet.displayName || pet.slug)}</strong>
+        <span>${escapeText([pet.kind, pet.submittedBy && `by ${pet.submittedBy}`].filter(Boolean).join(" - ") || pet.slug)}</span>
+      </div>
+      <button class="petdex-install" data-install-pet="${escapeAttribute(pet.slug)}" type="button">Install</button>
+    </article>
+  `;
+}
+
+async function installPetdexPet(slug) {
+  const pet = petdexPets.find((candidate) => candidate.slug === slug);
+  if (!pet || !invokeCommand) return;
+
+  const button = petdexListEl.querySelector(`[data-install-pet="${CSS.escape(slug)}"]`);
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Installing";
+  }
+
+  try {
+    const installed = await invokeCommand("install_petdex_pet", {
+      request: { ...pet, installDir: petStorageDir || null }
+    });
+    setPetdexStatus(`${installed.displayName} installed.`);
+    await loadInstalledPets(invokeCommand);
+    loadNativePet(installed);
+    setSettingsPage("settings");
+  } catch (error) {
+    setPetdexStatus(`Install failed: ${error}`);
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Install";
+    }
+  }
+}
+
+function setPetdexStatus(message) {
+  petdexStatusEl.textContent = message;
+  petdexStatusEl.title = message;
 }
 
 function initializeUpdateSettings() {

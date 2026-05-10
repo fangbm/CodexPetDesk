@@ -184,6 +184,41 @@ input {
   background: rgb(255 255 255 / 0.045);
 }
 
+.settings-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 8px;
+  background: rgb(255 255 255 / 0.05);
+}
+
+.tab-button {
+  height: 30px;
+  border: 0;
+  border-radius: 6px;
+  color: rgb(247 242 232 / 0.66);
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tab-button.is-active {
+  color: #061713;
+  background: #55dfb2;
+}
+
+.settings-page {
+  display: none;
+  gap: 12px;
+}
+
+.settings-page.is-active {
+  display: grid;
+}
+
 .section-title {
   color: rgb(247 242 232 / 0.52);
   font-size: 11px;
@@ -240,7 +275,8 @@ input {
 }
 
 .scale-control,
-.native-pets {
+.native-pets,
+.storage-control {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 10px;
@@ -249,18 +285,29 @@ input {
   font-size: 12px;
 }
 
-.scale-control input {
+.scale-control input,
+.storage-control input {
   width: 100%;
+}
+
+.scale-control input {
   accent-color: #55dfb2;
 }
 
-.native-pets select {
+.native-pets select,
+.storage-control input {
   min-width: 0;
   height: 30px;
   border: 1px solid rgb(255 255 255 / 0.14);
   border-radius: 6px;
   color: #f7f2e8;
   background: rgb(255 255 255 / 0.08);
+}
+
+.storage-control input {
+  padding: 0 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .native-pets.is-hidden {
@@ -323,6 +370,92 @@ input {
   inset: 0;
   opacity: 0;
   cursor: pointer;
+}
+
+.status-text {
+  color: rgb(247 242 232 / 0.58);
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.petdex-list {
+  display: grid;
+  gap: 8px;
+}
+
+.petdex-card {
+  display: grid;
+  grid-template-columns: 54px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 70px;
+  padding: 8px;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 8px;
+  background: rgb(255 255 255 / 0.045);
+}
+
+.petdex-thumb {
+  width: 54px;
+  height: 54px;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 7px;
+  background-color: rgb(0 0 0 / 0.18);
+  background-image: var(--sprite-url);
+  background-position: 0 0;
+  background-repeat: no-repeat;
+  background-size: 399px 432px;
+  image-rendering: pixelated;
+}
+
+.petdex-card-body {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.petdex-card-body strong,
+.petdex-card-body span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.petdex-card-body strong {
+  color: #f7f2e8;
+  font-size: 13px;
+}
+
+.petdex-card-body span {
+  color: rgb(247 242 232 / 0.58);
+  font-size: 11px;
+}
+
+.petdex-install {
+  width: 66px;
+  height: 30px;
+  border: 1px solid rgb(85 223 178 / 0.44);
+  border-radius: 6px;
+  color: #97efd2;
+  background: rgb(85 223 178 / 0.08);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.petdex-install:disabled,
+.file-button:disabled,
+.primary-action:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+
+.empty-state {
+  padding: 18px 10px;
+  color: rgb(247 242 232 / 0.58);
+  font-size: 12px;
+  text-align: center;
 }
 
 body.is-dragging .panel {
