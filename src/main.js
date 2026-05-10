@@ -11,6 +11,7 @@ const WHEEL_SCALE_STEP = 0.08;
 const STARTUP_UPDATE_CHECK_KEY = "codex-pet-desk.check-updates-on-startup";
 const PET_STORAGE_DIR_KEY = "codex-pet-desk.pet-storage-dir";
 const UPDATE_PROXY_KEY = "codex-pet-desk.update-proxy";
+const HOOK_PROMPT_KEY = "codex-pet-desk.hook-prompt-v1";
 const UPDATE_CHECK_TIMEOUT = 20000;
 const UPDATE_PROXY_CANDIDATES = [
   "http://127.0.0.1:7890",
@@ -47,10 +48,13 @@ const folderInputEl = document.querySelector("#folder-input");
 const scaleEl = document.querySelector("#scale");
 const petDescriptionEl = document.querySelector("#pet-description");
 const appVersionEl = document.querySelector("#app-version");
+const speechBubbleEl = document.querySelector("#speech-bubble");
 const startupUpdateCheckEl = document.querySelector("#startup-update-check");
 const checkUpdateEl = document.querySelector("#check-update");
 const updateStatusEl = document.querySelector("#update-status");
 const updateProxyEl = document.querySelector("#update-proxy");
+const installHooksEl = document.querySelector("#install-hooks");
+const hookStatusEl = document.querySelector("#hook-status");
 const petStoragePathEl = document.querySelector("#pet-storage-path");
 const chooseStorageEl = document.querySelector("#choose-storage");
 const resetStorageEl = document.querySelector("#reset-storage");
@@ -78,6 +82,7 @@ let LogicalSize = null;
 let emitEvent = null;
 let invokeCommand = null;
 let openDialog = null;
+let askDialog = null;
 let isPetHovered = false;
 let lastWindowX = null;
 let movementSettleTimer = 0;
@@ -85,6 +90,8 @@ let appVersion = "0.1.0";
 let defaultPetStorageDir = "";
 let petStorageDir = localStorage.getItem(PET_STORAGE_DIR_KEY) || "";
 let petdexPets = [];
+let speechBubbleTimer = 0;
+let hookPollTimer = 0;
 
 appEl.classList.toggle("shell--settings", isSettingsWindow);
 appEl.classList.toggle("shell--pet", !isSettingsWindow);
@@ -129,6 +136,7 @@ updateProxyEl.addEventListener("change", () => {
   }
 });
 
+installHooksEl.addEventListener("click", () => installCodeHooksFromSettings());
 chooseStorageEl.addEventListener("click", choosePetStorageDir);
 resetStorageEl.addEventListener("click", async () => {
   localStorage.removeItem(PET_STORAGE_DIR_KEY);
@@ -249,6 +257,7 @@ async function initializeTauriRuntime() {
   emitEvent = tauri.emit;
   invokeCommand = tauri.invoke;
   openDialog = tauri.openDialog;
+  askDialog = tauri.askDialog;
   appVersion = await tauri.getVersion();
   setAppVersion(`Version ${appVersion}`);
   defaultPetStorageDir = await tauri.invoke("default_pet_storage_dir");
@@ -278,8 +287,11 @@ async function initializeTauriRuntime() {
       handleWindowMoved(payload.x);
     });
     if (shouldCheckUpdatesOnStartup()) checkForUpdates();
+    startHookPolling();
+    await maybePromptForHooks();
   }
 
+  await refreshHookStatus();
   await loadInstalledPets(tauri.invoke);
   if (isSettingsWindow && initialSettingsPage === "pets") loadPetdexPets();
   panelEl.hidden = !isSettingsWindow;
@@ -320,14 +332,14 @@ function loadNativePet(pet) {
 async function getTauriApi() {
   if (!("__TAURI_INTERNALS__" in window)) return null;
   try {
-    const [{ invoke }, { listen, emit }, { getCurrentWindow, LogicalSize: TauriLogicalSize }, { getVersion }, { open: openDialog }] = await Promise.all([
+    const [{ invoke }, { listen, emit }, { getCurrentWindow, LogicalSize: TauriLogicalSize }, { getVersion }, { open: openDialog, ask }] = await Promise.all([
       import("@tauri-apps/api/core"),
       import("@tauri-apps/api/event"),
       import("@tauri-apps/api/window"),
       import("@tauri-apps/api/app"),
       import("@tauri-apps/plugin-dialog")
     ]);
-    return { invoke, listen, emit, getVersion, openDialog, currentWindow: getCurrentWindow(), LogicalSize: TauriLogicalSize };
+    return { invoke, listen, emit, getVersion, openDialog, askDialog: ask, currentWindow: getCurrentWindow(), LogicalSize: TauriLogicalSize };
   } catch {
     return null;
   }
@@ -505,6 +517,118 @@ function setAppVersion(text) {
 function setUpdateStatus(message) {
   updateStatusEl.textContent = message;
   updateStatusEl.title = message;
+}
+
+async function maybePromptForHooks() {
+  if (!invokeCommand || !askDialog || localStorage.getItem(HOOK_PROMPT_KEY)) return;
+  localStorage.setItem(HOOK_PROMPT_KEY, "asked");
+  const shouldInstall = await askDialog(
+    "是否安装 Code hooks？安装后 Codex CLI 和 Claude Code 当前任务结束时，桌宠会弹出气泡提醒你任务已完成。",
+    { title: "Codex Pet Desk", kind: "info" }
+  );
+  if (!shouldInstall) return;
+
+  try {
+    await invokeCommand("install_code_hooks");
+    await refreshHookStatus();
+    showSpeechBubble("Code hooks 已安装，任务完成时我会提醒你。");
+  } catch (error) {
+    console.info("Hook install skipped:", error);
+  }
+}
+
+async function installCodeHooksFromSettings() {
+  if (!invokeCommand) return;
+  installHooksEl.disabled = true;
+  setHookStatus("Installing hooks...");
+  try {
+    const status = await invokeCommand("install_code_hooks");
+    renderHookStatus(status);
+    showSettingsMessage("Code hooks installed.");
+    if (!isSettingsWindow) showSpeechBubble("Code hooks 已安装。");
+  } catch (error) {
+    setHookStatus(`Hook install failed: ${error}`);
+  } finally {
+    installHooksEl.disabled = false;
+  }
+}
+
+async function refreshHookStatus() {
+  if (!invokeCommand) return;
+  try {
+    renderHookStatus(await invokeCommand("hook_status"));
+  } catch (error) {
+    setHookStatus(`Hook status unavailable: ${error}`);
+  }
+}
+
+function renderHookStatus(status) {
+  const installedTargets = (status.targets || [])
+    .filter((target) => target.installed)
+    .map((target) => target.name);
+  setHookStatus(installedTargets.length
+    ? `Installed for ${installedTargets.join(", ")}.`
+    : "Hooks are not installed yet.");
+}
+
+function setHookStatus(message) {
+  hookStatusEl.textContent = message;
+  hookStatusEl.title = message;
+}
+
+function startHookPolling() {
+  if (!invokeCommand || hookPollTimer) return;
+  pollHookEvents();
+  hookPollTimer = window.setInterval(pollHookEvents, 2500);
+}
+
+async function pollHookEvents() {
+  if (!invokeCommand || isSettingsWindow) return;
+  try {
+    const events = await invokeCommand("take_hook_events");
+    const latestComplete = [...events].reverse().find((event) => {
+      const type = event.type || event.eventType;
+      return type === "complete";
+    });
+    if (latestComplete) {
+      showTaskCompleteBubble(latestComplete);
+    }
+  } catch (error) {
+    console.info("Hook polling skipped:", error);
+  }
+}
+
+function showTaskCompleteBubble(event) {
+  const agent = formatHookAgent(event.agent);
+  const detail = String(event.message || "").trim();
+  const message = detail && detail !== "任务已经完成"
+    ? `${agent} 任务已经完成：${detail}`
+    : `${agent} 任务已经完成。`;
+  showSpeechBubble(message);
+}
+
+function formatHookAgent(agent) {
+  const normalized = String(agent || "").toLowerCase();
+  if (normalized === "codex") return "Codex";
+  if (normalized === "claude-code") return "Claude Code";
+  return "Code";
+}
+
+function showSpeechBubble(message) {
+  if (isSettingsWindow || !speechBubbleEl) return;
+  speechBubbleEl.textContent = message;
+  appEl.classList.add("has-bubble");
+  setState("waving");
+  window.clearTimeout(speechBubbleTimer);
+  speechBubbleTimer = window.setTimeout(hideSpeechBubble, 8500);
+  resizePetWindow();
+}
+
+function hideSpeechBubble() {
+  appEl.classList.remove("has-bubble");
+  if (speechBubbleEl) speechBubbleEl.textContent = "";
+  if (!isPetHovered) setState("idle");
+  resizePetWindow();
 }
 
 async function checkForUpdates({ manual = false } = {}) {
@@ -715,8 +839,9 @@ function updateScale(nextScale, broadcast = true) {
 
 function resizePetWindow() {
   if (isSettingsWindow || !currentWindow || !LogicalSize) return;
+  const bubbleHeight = appEl.classList.contains("has-bubble") ? 82 : 0;
   const width = Math.ceil(CELL_WIDTH * scale + PET_WINDOW_PADDING);
-  const height = Math.ceil(CELL_HEIGHT * scale + PET_WINDOW_PADDING);
+  const height = Math.ceil(CELL_HEIGHT * scale + PET_WINDOW_PADDING + bubbleHeight);
   currentWindow.setSize(new LogicalSize(width, height));
 }
 
@@ -731,5 +856,7 @@ function readFileAsDataUrl(file) {
 
 window.addEventListener("beforeunload", () => {
   cancelAnimationFrame(rafId);
+  window.clearInterval(hookPollTimer);
+  window.clearTimeout(speechBubbleTimer);
   if (loadedObjectUrl) URL.revokeObjectURL(loadedObjectUrl);
 });

@@ -1,5 +1,6 @@
 use base64::Engine;
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use std::{
     env, fs,
     io::{Cursor, Read},
@@ -18,6 +19,8 @@ const MENU_OPEN_SETTINGS: &str = "open_settings";
 const MENU_OPEN_PETS: &str = "open_pets";
 const MENU_TOGGLE_PET: &str = "toggle_pet";
 const MENU_QUIT: &str = "quit";
+const HOOK_SOURCE_MARKER: &str = "codex-pet-desk";
+const HOOK_SCRIPT: &str = include_str!("../hooks/codex-pet-hook.cjs");
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -70,6 +73,41 @@ struct NativePet {
     sprite_data_url: String,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct HookTargetStatus {
+    name: String,
+    path: String,
+    installed: bool,
+    detail: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct HookStatus {
+    installed: bool,
+    hook_script: String,
+    event_file: String,
+    targets: Vec<HookTargetStatus>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HookEvent {
+    #[serde(default)]
+    event_type: String,
+    #[serde(default)]
+    r#type: String,
+    #[serde(default)]
+    agent: String,
+    #[serde(default)]
+    message: String,
+    #[serde(default)]
+    cwd: String,
+    #[serde(default)]
+    timestamp: u64,
+}
+
 #[tauri::command]
 fn list_codex_pets(pets_dir: Option<String>) -> Result<Vec<NativePet>, String> {
     let pets_dir = resolve_pets_dir(pets_dir)?;
@@ -106,6 +144,35 @@ fn list_codex_pets(pets_dir: Option<String>) -> Result<Vec<NativePet>, String> {
 #[tauri::command]
 fn default_pet_storage_dir() -> Result<String, String> {
     codex_pets_dir().map(|path| path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn hook_status() -> Result<HookStatus, String> {
+    build_hook_status()
+}
+
+#[tauri::command]
+fn install_code_hooks() -> Result<HookStatus, String> {
+    let script = write_hook_script()?;
+    install_codex_hook(&script)?;
+    install_claude_hook(&script)?;
+    build_hook_status()
+}
+
+#[tauri::command]
+fn take_hook_events() -> Result<Vec<HookEvent>, String> {
+    let file = hook_event_file()?;
+    if !file.exists() {
+        return Ok(Vec::new());
+    }
+
+    let content = fs::read_to_string(&file).map_err(|error| error.to_string())?;
+    let _ = fs::remove_file(&file);
+    let events = content
+        .lines()
+        .filter_map(|line| serde_json::from_str::<HookEvent>(line).ok())
+        .collect();
+    Ok(events)
 }
 
 #[tauri::command]
@@ -201,6 +268,255 @@ fn codex_pets_dir() -> Result<PathBuf, String> {
     home_dir()
         .map(|home| home.join(".codex").join("pets"))
         .ok_or_else(|| "Could not find the user home directory.".to_string())
+}
+
+fn codex_pet_runtime_dir() -> Result<PathBuf, String> {
+    home_dir()
+        .map(|home| home.join(".codex-pet-desk"))
+        .ok_or_else(|| "Could not find the user home directory.".to_string())
+}
+
+fn hook_dir() -> Result<PathBuf, String> {
+    Ok(codex_pet_runtime_dir()?.join("hooks"))
+}
+
+fn hook_script_path() -> Result<PathBuf, String> {
+    Ok(hook_dir()?.join("codex-pet-hook.cjs"))
+}
+
+fn hook_event_file() -> Result<PathBuf, String> {
+    Ok(codex_pet_runtime_dir()?.join("hook-events.jsonl"))
+}
+
+fn codex_config_path() -> Result<PathBuf, String> {
+    home_dir()
+        .map(|home| home.join(".codex").join("config.toml"))
+        .ok_or_else(|| "Could not find the user home directory.".to_string())
+}
+
+fn claude_settings_path() -> Result<PathBuf, String> {
+    home_dir()
+        .map(|home| home.join(".claude").join("settings.json"))
+        .ok_or_else(|| "Could not find the user home directory.".to_string())
+}
+
+fn write_hook_script() -> Result<PathBuf, String> {
+    let script = hook_script_path()?;
+    if let Some(parent) = script.parent() {
+        fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    }
+    fs::write(&script, HOOK_SCRIPT).map_err(|error| error.to_string())?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&script, fs::Permissions::from_mode(0o755))
+            .map_err(|error| error.to_string())?;
+    }
+    Ok(script)
+}
+
+fn build_hook_status() -> Result<HookStatus, String> {
+    let script = hook_script_path()?;
+    let event_file = hook_event_file()?;
+    let codex_path = codex_config_path()?;
+    let claude_path = claude_settings_path()?;
+
+    let codex_installed = codex_path
+        .exists()
+        .then(|| fs::read_to_string(&codex_path).ok())
+        .flatten()
+        .map(|content| content.contains(HOOK_SOURCE_MARKER))
+        .unwrap_or(false);
+    let claude_installed = claude_path
+        .exists()
+        .then(|| fs::read_to_string(&claude_path).ok())
+        .flatten()
+        .map(|content| content.contains(HOOK_SOURCE_MARKER))
+        .unwrap_or(false);
+
+    let targets = vec![
+        HookTargetStatus {
+            name: "Codex CLI".to_string(),
+            path: codex_path.to_string_lossy().to_string(),
+            installed: codex_installed,
+            detail: "Uses top-level notify in config.toml.".to_string(),
+        },
+        HookTargetStatus {
+            name: "Claude Code".to_string(),
+            path: claude_path.to_string_lossy().to_string(),
+            installed: claude_installed,
+            detail: "Uses a Stop hook in settings.json.".to_string(),
+        },
+    ];
+    Ok(HookStatus {
+        installed: script.exists() && targets.iter().any(|target| target.installed),
+        hook_script: script.to_string_lossy().to_string(),
+        event_file: event_file.to_string_lossy().to_string(),
+        targets,
+    })
+}
+
+fn install_codex_hook(script: &Path) -> Result<(), String> {
+    let config = codex_config_path()?;
+    if let Some(parent) = config.parent() {
+        fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    }
+    let content = if config.exists() {
+        fs::read_to_string(&config).map_err(|error| error.to_string())?
+    } else {
+        String::new()
+    };
+
+    let args = vec![
+        "node".to_string(),
+        script.to_string_lossy().to_string(),
+        "--agent".to_string(),
+        "codex".to_string(),
+        "--event".to_string(),
+        "notify".to_string(),
+    ];
+    let updated = toml_upsert_notify(&content, &toml_build_notify(&args));
+    fs::write(&config, ensure_trailing_newline(updated)).map_err(|error| error.to_string())
+}
+
+fn install_claude_hook(script: &Path) -> Result<(), String> {
+    let config = claude_settings_path()?;
+    let mut root = read_json_or_default(&config)?;
+    if !root.is_object() {
+        root = json!({});
+    }
+    if root.get("hooks").is_none() || !root["hooks"].is_object() {
+        root["hooks"] = json!({});
+    }
+
+    let command = format!(
+        "node \"{}\" --agent claude-code --event Stop",
+        script.to_string_lossy()
+    );
+    let hooks = root["hooks"]
+        .as_object_mut()
+        .ok_or_else(|| "Claude hooks is not an object.".to_string())?;
+    let entries = hooks.entry("Stop".to_string()).or_insert_with(|| json!([]));
+    if !entries.is_array() {
+        *entries = json!([]);
+    }
+    let entries = entries
+        .as_array_mut()
+        .ok_or_else(|| "Claude Stop hooks is not an array.".to_string())?;
+
+    let mut found = false;
+    for outer in entries.iter_mut() {
+        if let Some(inner) = outer.get_mut("hooks").and_then(Value::as_array_mut) {
+            if inner.iter().any(hook_command_has_marker) {
+                for hook in inner
+                    .iter_mut()
+                    .filter(|hook| hook_command_has_marker(hook))
+                {
+                    *hook = json!({ "type": "command", "command": command.clone() });
+                }
+                found = true;
+                break;
+            }
+        }
+    }
+    if !found {
+        entries.push(json!({
+            "matcher": "",
+            "hooks": [{ "type": "command", "command": command.clone() }]
+        }));
+    }
+
+    write_json(&config, &root)
+}
+
+fn hook_command_has_marker(value: &Value) -> bool {
+    value
+        .get("command")
+        .and_then(Value::as_str)
+        .map(|command| command.contains(HOOK_SOURCE_MARKER))
+        .unwrap_or(false)
+}
+
+fn read_json_or_default(path: &Path) -> Result<Value, String> {
+    if !path.exists() {
+        return Ok(json!({}));
+    }
+    let raw = fs::read_to_string(path).map_err(|error| error.to_string())?;
+    serde_json::from_str(&raw).map_err(|error| error.to_string())
+}
+
+fn write_json(path: &Path, value: &Value) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    }
+    let body = serde_json::to_string_pretty(value).map_err(|error| error.to_string())?;
+    fs::write(path, ensure_trailing_newline(body)).map_err(|error| error.to_string())
+}
+
+fn toml_build_notify(args: &[String]) -> String {
+    let items: Vec<String> = args
+        .iter()
+        .map(|arg| serde_json::to_string(arg).unwrap_or_else(|_| format!("{arg:?}")))
+        .collect();
+    format!("notify = [{}] # {HOOK_SOURCE_MARKER}", items.join(", "))
+}
+
+fn toml_upsert_notify(content: &str, new_line: &str) -> String {
+    let lines: Vec<&str> = content.lines().collect();
+    if let Some((start, end)) = toml_notify_span(&lines) {
+        let mut result = Vec::with_capacity(lines.len());
+        result.extend(lines[..start].iter().map(|line| line.to_string()));
+        result.push(new_line.to_string());
+        result.extend(lines[end + 1..].iter().map(|line| line.to_string()));
+        return result.join("\n");
+    }
+
+    if content.trim().is_empty() {
+        return new_line.to_string();
+    }
+
+    let insert_at = lines
+        .iter()
+        .position(|line| line.trim_start().starts_with('['))
+        .unwrap_or(lines.len());
+    let mut result = Vec::with_capacity(lines.len() + 1);
+    result.extend(lines[..insert_at].iter().map(|line| line.to_string()));
+    result.push(new_line.to_string());
+    result.extend(lines[insert_at..].iter().map(|line| line.to_string()));
+    result.join("\n")
+}
+
+fn toml_notify_span(lines: &[&str]) -> Option<(usize, usize)> {
+    let mut start = None;
+    for (index, line) in lines.iter().enumerate() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with('[') {
+            break;
+        }
+        if trimmed.starts_with("notify") {
+            start = Some(index);
+            break;
+        }
+    }
+
+    let start = start?;
+    let first = lines[start];
+    if first.contains('[') && first.contains(']') {
+        return Some((start, start));
+    }
+    for (index, line) in lines.iter().enumerate().skip(start) {
+        if line.contains(']') {
+            return Some((start, index));
+        }
+    }
+    Some((start, start))
+}
+
+fn ensure_trailing_newline(mut value: String) -> String {
+    if !value.ends_with('\n') {
+        value.push('\n');
+    }
+    value
 }
 
 fn install_from_zip(zip_url: &str, pet_dir: &Path) -> Result<(), String> {
@@ -392,8 +708,11 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             default_pet_storage_dir,
             fetch_petdex_pets,
+            hook_status,
+            install_code_hooks,
             install_petdex_pet,
-            list_codex_pets
+            list_codex_pets,
+            take_hook_events
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Codex Pet Desk");
