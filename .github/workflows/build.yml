@@ -54,6 +54,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
 
       - name: Install Linux Tauri dependencies
         if: runner.os == 'Linux'
@@ -105,15 +107,115 @@ jobs:
           fs.appendFileSync(process.env.GITHUB_ENV, `RELEASE_VERSION=${version}\n`);
           NODE
 
-      - name: Build and publish release
-        uses: tauri-apps/tauri-action@v0
+      - name: Build Tauri app
+        run: npm run tauri:build
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
         with:
-          tagName: codex-pet-desk-v${{ env.RELEASE_VERSION }}
-          releaseName: Codex Pet Desk v${{ env.RELEASE_VERSION }}
-          releaseBody: Automated full build from ${{ github.sha }}.
-          releaseDraft: false
-          prerelease: false
+          name: codex-pet-desk-${{ matrix.platform.name }}
+          if-no-files-found: error
+          path: src-tauri/target/release/bundle/**/*
+
+  publish-release:
+    name: Publish release
+    runs-on: ubuntu-22.04
+    needs: build
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: Set release version
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" && "${GITHUB_REF_NAME#v}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.].+)?$ ]]; then
+            echo "RELEASE_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          else
+            echo "RELEASE_VERSION=0.1.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Prepare release assets
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const path = require("node:path");
+
+          const root = "release-artifacts";
+          const out = "release-upload";
+          const repo = process.env.GITHUB_REPOSITORY;
+          const version = process.env.RELEASE_VERSION;
+          const tag = `codex-pet-desk-v${version}`;
+          const notes = `Automated full build from ${process.env.GITHUB_SHA}.`;
+          const platforms = {};
+
+          fs.rmSync(out, { recursive: true, force: true });
+          fs.mkdirSync(out, { recursive: true });
+
+          function walk(dir) {
+            return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+              const full = path.join(dir, entry.name);
+              return entry.isDirectory() ? walk(full) : [full];
+            });
+          }
+
+          function copyAsset(file) {
+            const name = path.basename(file);
+            const dest = path.join(out, name);
+            fs.copyFileSync(file, dest);
+            return name;
+          }
+
+          function assetUrl(name) {
+            return `https://github.com/${repo}/releases/download/${tag}/${encodeURIComponent(name)}`;
+          }
+
+          function addUpdater(platform, matcher, rank = () => 0) {
+            const file = files
+              .filter(matcher)
+              .sort((a, b) => rank(b) - rank(a))[0];
+            if (!file) throw new Error(`Missing updater artifact for ${platform}`);
+            const sigFile = `${file}.sig`;
+            if (!fs.existsSync(sigFile)) throw new Error(`Missing signature for ${path.basename(file)}`);
+            const name = copyAsset(file);
+            copyAsset(sigFile);
+            platforms[platform] = {
+              signature: fs.readFileSync(sigFile, "utf8").trim(),
+              url: assetUrl(name)
+            };
+          }
+
+          const files = walk(root);
+          for (const file of files) {
+            if (!file.endsWith(".sig")) copyAsset(file);
+          }
+
+          addUpdater(
+            "windows-x86_64",
+            (file) => /windows-x64/.test(file) && /\.zip$/i.test(file),
+            (file) => /nsis|setup/i.test(file) ? 2 : /msi/i.test(file) ? 1 : 0
+          );
+          addUpdater("darwin-aarch64", (file) => /macos-arm64/.test(file) && /\.app\.tar\.gz$/i.test(file));
+          addUpdater("linux-x86_64", (file) => /linux-x64/.test(file) && /\.AppImage\.tar\.gz$/i.test(file));
+
+          fs.writeFileSync(path.join(out, "latest.json"), `${JSON.stringify({
+            version,
+            notes,
+            pub_date: new Date().toISOString(),
+            platforms
+          }, null, 2)}\n`);
+          NODE
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="codex-pet-desk-v${RELEASE_VERSION}"
+          gh release delete "$TAG" --yes --cleanup-tag || true
+          gh release create "$TAG" release-upload/* \
+            --title "Codex Pet Desk v${RELEASE_VERSION}" \
+            --notes "Automated full build from ${GITHUB_SHA}."

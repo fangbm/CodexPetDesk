@@ -1,3 +1,5 @@
+import "./styles.css";
+
 const CELL_WIDTH = 192;
 const CELL_HEIGHT = 208;
 const COLUMNS = 8;
@@ -310,12 +312,21 @@ async function checkForUpdates({ manual = false } = {}) {
     if (manual) setUpdateStatus("Update installed. Restarting...");
     await relaunch();
   } catch (error) {
-    const message = "Update check failed.";
+    const message = updateErrorMessage(error);
     if (manual) setUpdateStatus(message);
     console.info("Update check skipped:", error);
   } finally {
     if (manual) checkUpdateEl.disabled = false;
   }
+}
+
+function updateErrorMessage(error) {
+  const detail = String(error?.message || error || "").trim();
+  if (!detail) return "Update check failed.";
+  if (/platform/i.test(detail)) return "No update package for this platform yet.";
+  if (/signature|pubkey|public key/i.test(detail)) return "Update signature verification failed.";
+  if (/404|not found/i.test(detail)) return "Update manifest was not found.";
+  return `Update check failed: ${detail}`;
 }
 
 function applyPet(pet) {
