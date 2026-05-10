@@ -1,10 +1,12 @@
 name: Full Build
 
 on:
+  workflow_run:
+    workflows:
+      - Lightweight CI
+    types:
+      - completed
   push:
-    branches:
-      - main
-      - master
     tags:
       - "v*"
   workflow_dispatch:
@@ -15,6 +17,13 @@ permissions:
 jobs:
   validate-release-secrets:
     name: Validate release secrets
+    if: >
+      github.event_name != 'workflow_run' ||
+      (
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        (github.event.workflow_run.head_branch == 'main' || github.event.workflow_run.head_branch == 'master')
+      )
     runs-on: ubuntu-22.04
     steps:
       - name: Check updater signing secret
