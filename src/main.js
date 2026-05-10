@@ -958,7 +958,7 @@ function updateScale(nextScale, broadcast = true) {
 }
 
 function resizePetWindow(options = {}) {
-  void resizePetWindowToLayout(options);
+  void resizePetWindowToLayout({ keepPetAnchored: true, ...options });
 }
 
 async function resizePetWindowToLayout({ keepPetAnchored = false, hasBubble = null } = {}) {
