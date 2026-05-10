@@ -189,18 +189,25 @@ jobs:
             };
           }
 
+          function isReleaseAsset(file) {
+            const name = path.basename(file);
+            return /\.(exe|msi|dmg|AppImage|deb|rpm)$/i.test(name) || /\.app\.tar\.gz$/i.test(name);
+          }
+
           const files = walk(root);
           for (const file of files) {
-            if (!file.endsWith(".sig")) copyAsset(file);
+            if (isReleaseAsset(file) || (file.endsWith(".sig") && isReleaseAsset(file.slice(0, -4)))) {
+              copyAsset(file);
+            }
           }
 
           addUpdater(
             "windows-x86_64",
-            (file) => /windows-x64/.test(file) && /\.zip$/i.test(file),
-            (file) => /nsis|setup/i.test(file) ? 2 : /msi/i.test(file) ? 1 : 0
+            (file) => /windows-x64/.test(file) && /\.(exe|msi)$/i.test(file),
+            (file) => /setup\.exe$/i.test(file) ? 2 : /\.msi$/i.test(file) ? 1 : 0
           );
           addUpdater("darwin-aarch64", (file) => /macos-arm64/.test(file) && /\.app\.tar\.gz$/i.test(file));
-          addUpdater("linux-x86_64", (file) => /linux-x64/.test(file) && /\.AppImage\.tar\.gz$/i.test(file));
+          addUpdater("linux-x86_64", (file) => /linux-x64/.test(file) && /\.AppImage$/i.test(file));
 
           fs.writeFileSync(path.join(out, "latest.json"), `${JSON.stringify({
             version,
