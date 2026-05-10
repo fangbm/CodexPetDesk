@@ -17,7 +17,9 @@ const UPDATE_PROXY_CANDIDATES = [
   "http://127.0.0.1:7897",
   "http://127.0.0.1:10809"
 ];
-const isSettingsWindow = new URLSearchParams(window.location.search).has("settings");
+const searchParams = new URLSearchParams(window.location.search);
+const isSettingsWindow = searchParams.has("settings");
+const initialSettingsPage = searchParams.get("page") === "pets" ? "pets" : "settings";
 
 const STATES = {
   idle: { row: 0, durations: [280, 110, 110, 140, 140, 320] },
@@ -86,6 +88,7 @@ let petdexPets = [];
 
 appEl.classList.toggle("shell--settings", isSettingsWindow);
 appEl.classList.toggle("shell--pet", !isSettingsWindow);
+setSettingsPage(initialSettingsPage);
 applyScale();
 setState("idle");
 requestAnimationFrame(tick);
@@ -276,7 +279,7 @@ async function initializeTauriRuntime() {
   }
 
   await loadInstalledPets(tauri.invoke);
-  if (isSettingsWindow) loadPetdexPets();
+  if (isSettingsWindow && initialSettingsPage === "pets") loadPetdexPets();
   panelEl.hidden = !isSettingsWindow;
 }
 

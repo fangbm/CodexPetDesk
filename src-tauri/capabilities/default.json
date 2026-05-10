@@ -4,7 +4,8 @@
   "description": "Default app capability for the pet and settings windows.",
   "windows": [
     "main",
-    "settings"
+    "settings",
+    "pets"
   ],
   "permissions": [
     "core:default",

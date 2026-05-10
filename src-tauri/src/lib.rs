@@ -12,8 +12,10 @@ use tauri::{
 
 const MAIN_WINDOW_LABEL: &str = "main";
 const SETTINGS_WINDOW_LABEL: &str = "settings";
+const PETS_WINDOW_LABEL: &str = "pets";
 const TRAY_ID: &str = "codex-pet-desk-tray";
 const MENU_OPEN_SETTINGS: &str = "open_settings";
+const MENU_OPEN_PETS: &str = "open_pets";
 const MENU_TOGGLE_PET: &str = "toggle_pet";
 const MENU_QUIT: &str = "quit";
 
@@ -409,7 +411,20 @@ fn create_tray(app_handle: &tauri::AppHandle) -> tauri::Result<()> {
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
             MENU_OPEN_SETTINGS => {
-                let _ = open_or_focus_settings_window(app);
+                let _ = open_or_focus_control_window(
+                    app,
+                    SETTINGS_WINDOW_LABEL,
+                    "Codex Pet Desk Settings",
+                    "index.html?settings=1&page=settings",
+                );
+            }
+            MENU_OPEN_PETS => {
+                let _ = open_or_focus_control_window(
+                    app,
+                    PETS_WINDOW_LABEL,
+                    "Codex Pet Desk Pets",
+                    "index.html?settings=1&page=pets",
+                );
             }
             MENU_TOGGLE_PET => {
                 let _ = toggle_pet_window(app);
@@ -447,6 +462,7 @@ fn tray_menu(app_handle: &tauri::AppHandle, pet_visible: bool) -> tauri::menu::M
 
     MenuBuilder::new(app_handle)
         .text(MENU_OPEN_SETTINGS, "Settings")
+        .text(MENU_OPEN_PETS, "Pets")
         .text(MENU_TOGGLE_PET, visibility_label)
         .separator()
         .text(MENU_QUIT, "Quit")
@@ -454,27 +470,28 @@ fn tray_menu(app_handle: &tauri::AppHandle, pet_visible: bool) -> tauri::menu::M
         .expect("failed to build tray menu")
 }
 
-fn open_or_focus_settings_window(app_handle: &tauri::AppHandle) -> Result<(), String> {
-    if let Some(window) = app_handle.get_webview_window(SETTINGS_WINDOW_LABEL) {
+fn open_or_focus_control_window(
+    app_handle: &tauri::AppHandle,
+    label: &str,
+    title: &str,
+    url: &str,
+) -> Result<(), String> {
+    if let Some(window) = app_handle.get_webview_window(label) {
         window.show().map_err(|error| error.to_string())?;
         window.set_focus().map_err(|error| error.to_string())?;
         return Ok(());
     }
 
-    WebviewWindowBuilder::new(
-        app_handle,
-        SETTINGS_WINDOW_LABEL,
-        WebviewUrl::App("index.html?settings=1".into()),
-    )
-    .title("Codex Pet Desk Settings")
-    .inner_size(400.0, 620.0)
-    .min_inner_size(360.0, 560.0)
-    .resizable(false)
-    .decorations(true)
-    .skip_taskbar(true)
-    .focused(true)
-    .build()
-    .map_err(|error| error.to_string())?;
+    WebviewWindowBuilder::new(app_handle, label, WebviewUrl::App(url.into()))
+        .title(title)
+        .inner_size(640.0, 480.0)
+        .min_inner_size(640.0, 480.0)
+        .resizable(false)
+        .decorations(true)
+        .skip_taskbar(true)
+        .focused(true)
+        .build()
+        .map_err(|error| error.to_string())?;
 
     Ok(())
 }

@@ -28,6 +28,8 @@ input {
   display: grid;
   width: 100vw;
   height: 100vh;
+  min-width: 0;
+  min-height: 0;
   user-select: none;
 }
 
@@ -37,7 +39,9 @@ input {
 }
 
 .shell--settings {
-  grid-template-rows: minmax(120px, 0.48fr) minmax(0, 1fr);
+  grid-template-columns: 216px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 14px;
   min-height: 0;
   padding: 14px;
   overflow: hidden;
@@ -51,8 +55,14 @@ input {
 }
 
 .shell--settings .pet-stage {
-  min-height: 120px;
-  height: auto;
+  align-self: stretch;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 8px;
+  background: rgb(0 0 0 / 0.14);
+  overflow: hidden;
 }
 
 .pet-stage {
@@ -106,6 +116,7 @@ input {
 
 .shell--settings .panel {
   min-height: 0;
+  align-self: stretch;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-color: rgb(85 223 178 / 0.55) rgb(255 255 255 / 0.06);
@@ -139,6 +150,17 @@ input {
   gap: 10px;
   align-items: start;
   justify-content: space-between;
+}
+
+.shell--settings .settings-header {
+  position: sticky;
+  top: -14px;
+  z-index: 2;
+  margin: -14px -14px 0;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid rgb(255 255 255 / 0.08);
+  background: rgb(17 21 23 / 0.92);
+  backdrop-filter: blur(16px);
 }
 
 .pet-meta {
@@ -219,6 +241,20 @@ input {
   display: grid;
 }
 
+.settings-page[data-page="settings"].is-active {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+.settings-page[data-page="settings"] .settings-section {
+  min-width: 0;
+}
+
+.settings-page[data-page="settings"] .settings-section:first-child,
+.settings-page[data-page="settings"] .settings-section:last-child {
+  grid-column: 1 / -1;
+}
+
 .section-title {
   color: rgb(247 242 232 / 0.52);
   font-size: 11px;
@@ -238,7 +274,7 @@ input {
 
 .controls {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
 }
 
