@@ -6,6 +6,7 @@ const PET_WINDOW_PADDING = 16;
 const MIN_SCALE = 0.6;
 const MAX_SCALE = 2;
 const WHEEL_SCALE_STEP = 0.08;
+const STARTUP_UPDATE_CHECK_KEY = "codex-pet-desk.check-updates-on-startup";
 const isSettingsWindow = new URLSearchParams(window.location.search).has("settings");
 
 const STATES = {
@@ -35,6 +36,10 @@ const scaleEl = document.querySelector("#scale");
 const nativePetsEl = document.querySelector("#native-pets");
 const nativePetSelectEl = document.querySelector("#native-pet-select");
 const petDescriptionEl = document.querySelector("#pet-description");
+const appVersionEl = document.querySelector("#app-version");
+const startupUpdateCheckEl = document.querySelector("#startup-update-check");
+const checkUpdateEl = document.querySelector("#check-update");
+const updateStatusEl = document.querySelector("#update-status");
 const stateButtons = [...document.querySelectorAll(".state-button")];
 
 let currentPet = SAMPLE_PET;
@@ -52,6 +57,7 @@ let emitEvent = null;
 let isPetHovered = false;
 let lastWindowX = null;
 let movementSettleTimer = 0;
+let appVersion = "0.1.0";
 
 appEl.classList.toggle("shell--settings", isSettingsWindow);
 appEl.classList.toggle("shell--pet", !isSettingsWindow);
@@ -59,6 +65,7 @@ applyScale();
 setState("idle");
 requestAnimationFrame(tick);
 initializeTauriRuntime();
+initializeUpdateSettings();
 
 fileInputEl.addEventListener("change", () => loadFromFiles([...fileInputEl.files]));
 folderInputEl.addEventListener("change", () => loadFromFiles([...folderInputEl.files]));
@@ -73,6 +80,17 @@ scaleEl.addEventListener("input", () => {
 
 stateButtons.forEach((button) => {
   button.addEventListener("click", () => setState(button.dataset.state));
+});
+
+startupUpdateCheckEl.addEventListener("change", () => {
+  localStorage.setItem(STARTUP_UPDATE_CHECK_KEY, startupUpdateCheckEl.checked ? "1" : "0");
+  setUpdateStatus(startupUpdateCheckEl.checked
+    ? "Updates are checked automatically."
+    : "Startup checks are disabled.");
+});
+
+checkUpdateEl.addEventListener("click", () => {
+  checkForUpdates({ manual: true });
 });
 
 petEl.addEventListener("click", () => {
@@ -166,6 +184,7 @@ async function loadFromFiles(files) {
 async function initializeTauriRuntime() {
   const tauri = await getTauriApi();
   if (!tauri) {
+    setAppVersion("Browser preview");
     panelEl.hidden = !isSettingsWindow;
     return;
   }
@@ -173,6 +192,8 @@ async function initializeTauriRuntime() {
   currentWindow = tauri.currentWindow;
   LogicalSize = tauri.LogicalSize;
   emitEvent = tauri.emit;
+  appVersion = await tauri.getVersion();
+  setAppVersion(`Version ${appVersion}`);
   resizePetWindow();
 
   await tauri.listen("active-pet-changed", (event) => {
@@ -196,7 +217,7 @@ async function initializeTauriRuntime() {
     await currentWindow.onMoved(({ payload }) => {
       handleWindowMoved(payload.x);
     });
-    checkForUpdates();
+    if (shouldCheckUpdatesOnStartup()) checkForUpdates();
   }
 
   await loadInstalledPets(tauri.invoke);
@@ -236,29 +257,64 @@ function loadNativePet(pet) {
 async function getTauriApi() {
   if (!("__TAURI_INTERNALS__" in window)) return null;
   try {
-    const [{ invoke }, { listen, emit }, { getCurrentWindow, LogicalSize: TauriLogicalSize }] = await Promise.all([
+    const [{ invoke }, { listen, emit }, { getCurrentWindow, LogicalSize: TauriLogicalSize }, { getVersion }] = await Promise.all([
       import("@tauri-apps/api/core"),
       import("@tauri-apps/api/event"),
-      import("@tauri-apps/api/window")
+      import("@tauri-apps/api/window"),
+      import("@tauri-apps/api/app")
     ]);
-    return { invoke, listen, emit, currentWindow: getCurrentWindow(), LogicalSize: TauriLogicalSize };
+    return { invoke, listen, emit, getVersion, currentWindow: getCurrentWindow(), LogicalSize: TauriLogicalSize };
   } catch {
     return null;
   }
 }
 
-async function checkForUpdates() {
+function initializeUpdateSettings() {
+  startupUpdateCheckEl.checked = shouldCheckUpdatesOnStartup();
+  setUpdateStatus(startupUpdateCheckEl.checked
+    ? "Updates are checked automatically."
+    : "Startup checks are disabled.");
+}
+
+function shouldCheckUpdatesOnStartup() {
+  return localStorage.getItem(STARTUP_UPDATE_CHECK_KEY) !== "0";
+}
+
+function setAppVersion(text) {
+  appVersionEl.textContent = text;
+}
+
+function setUpdateStatus(message) {
+  updateStatusEl.textContent = message;
+}
+
+async function checkForUpdates({ manual = false } = {}) {
   try {
+    if (manual) {
+      checkUpdateEl.disabled = true;
+      setUpdateStatus("Checking for updates...");
+    }
+
     const [{ check }, { relaunch }] = await Promise.all([
       import("@tauri-apps/plugin-updater"),
       import("@tauri-apps/plugin-process")
     ]);
     const update = await check();
-    if (!update) return;
+    if (!update) {
+      if (manual) setUpdateStatus(`Version ${appVersion} is up to date.`);
+      return;
+    }
+
+    if (manual) setUpdateStatus(`Downloading version ${update.version}...`);
     await update.downloadAndInstall();
+    if (manual) setUpdateStatus("Update installed. Restarting...");
     await relaunch();
   } catch (error) {
+    const message = "Update check failed.";
+    if (manual) setUpdateStatus(message);
     console.info("Update check skipped:", error);
+  } finally {
+    if (manual) checkUpdateEl.disabled = false;
   }
 }
 

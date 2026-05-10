@@ -37,9 +37,11 @@ input {
 }
 
 .shell--settings {
-  grid-template-rows: minmax(220px, 1fr) auto;
-  padding: 12px;
-  background: #15191c;
+  grid-template-rows: minmax(170px, 0.9fr) auto;
+  padding: 14px;
+  background:
+    radial-gradient(circle at 20% 0%, rgb(85 223 178 / 0.16), transparent 34%),
+    linear-gradient(145deg, #11171a, #171316 58%, #121717);
 }
 
 .shell--pet .panel {
@@ -47,7 +49,7 @@ input {
 }
 
 .shell--settings .pet-stage {
-  min-height: 208px;
+  min-height: 168px;
 }
 
 .pet-stage {
@@ -89,12 +91,12 @@ input {
 
 .panel {
   display: grid;
-  gap: 10px;
-  padding: 12px;
+  gap: 12px;
+  padding: 14px;
   border: 1px solid rgb(255 255 255 / 0.18);
   border-radius: 8px;
-  background: rgb(19 23 26 / 0.72);
-  box-shadow: 0 18px 46px rgb(0 0 0 / 0.28);
+  background: rgb(17 21 23 / 0.82);
+  box-shadow: 0 18px 46px rgb(0 0 0 / 0.34);
   backdrop-filter: blur(16px);
   transition: opacity 140ms ease, transform 140ms ease;
 }
@@ -105,6 +107,13 @@ input {
   pointer-events: none;
 }
 
+.settings-header {
+  display: flex;
+  gap: 10px;
+  align-items: start;
+  justify-content: space-between;
+}
+
 .pet-meta {
   display: grid;
   gap: 2px;
@@ -113,7 +122,7 @@ input {
 
 .pet-meta strong {
   overflow: hidden;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -128,6 +137,43 @@ input {
   white-space: nowrap;
 }
 
+.status-pill {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border: 1px solid rgb(85 223 178 / 0.34);
+  border-radius: 999px;
+  color: #97efd2;
+  background: rgb(85 223 178 / 0.08);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.settings-section {
+  display: grid;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 8px;
+  background: rgb(255 255 255 / 0.045);
+}
+
+.section-title {
+  color: rgb(247 242 232 / 0.52);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.pet-description {
+  overflow: hidden;
+  color: rgb(247 242 232 / 0.72);
+  font-size: 12px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .controls {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -135,9 +181,10 @@ input {
 }
 
 .state-button,
-.file-button {
+.file-button,
+.primary-action {
   min-width: 0;
-  height: 30px;
+  height: 32px;
   border: 1px solid rgb(255 255 255 / 0.14);
   border-radius: 6px;
   color: #f7f2e8;
@@ -154,7 +201,8 @@ input {
 }
 
 .state-button:hover,
-.file-button:hover {
+.file-button:hover,
+.primary-action:hover {
   background: rgb(255 255 255 / 0.14);
 }
 
@@ -203,6 +251,46 @@ input {
   place-items: center;
   position: relative;
   font-size: 12px;
+}
+
+.primary-action {
+  width: 100%;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.toggle-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 14px;
+  align-items: center;
+}
+
+.toggle-row span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.toggle-row strong {
+  color: #f7f2e8;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.toggle-row small {
+  overflow: hidden;
+  color: rgb(247 242 232 / 0.58);
+  font-size: 11px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toggle-row input {
+  width: 36px;
+  height: 20px;
+  accent-color: #55dfb2;
 }
 
 .file-button input {

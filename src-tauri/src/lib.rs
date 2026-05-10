@@ -218,8 +218,8 @@ fn open_or_focus_settings_window(app_handle: &tauri::AppHandle) -> Result<(), St
         WebviewUrl::App("index.html?settings=1".into()),
     )
     .title("Codex Pet Desk Settings")
-    .inner_size(360.0, 390.0)
-    .min_inner_size(320.0, 340.0)
+    .inner_size(400.0, 620.0)
+    .min_inner_size(360.0, 560.0)
     .resizable(false)
     .decorations(true)
     .skip_taskbar(true)
