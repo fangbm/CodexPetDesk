@@ -146,11 +146,10 @@ jobs:
           const fs = require("node:fs");
           const refType = process.env.GITHUB_REF_TYPE;
           const refName = process.env.GITHUB_REF_NAME || "";
-          const runNumber = process.env.GITHUB_RUN_NUMBER;
           const tagVersion = refName.replace(/^v/, "");
           const version = refType === "tag" && /^\d+\.\d+\.\d+([-.].+)?$/.test(tagVersion)
             ? tagVersion
-            : `0.1.${runNumber}`;
+            : JSON.parse(fs.readFileSync("package.json", "utf8")).version;
 
           for (const file of ["package.json", "src-tauri/tauri.conf.json"]) {
             const json = JSON.parse(fs.readFileSync(file, "utf8"));
@@ -181,18 +180,78 @@ jobs:
     needs: build
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+          fetch-depth: 0
+
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
           path: release-artifacts
 
       - name: Set release version
+        shell: bash
         run: |
-          if [[ "${GITHUB_REF_TYPE}" == "tag" && "${GITHUB_REF_NAME#v}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.].+)?$ ]]; then
-            echo "RELEASE_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
-          else
-            echo "RELEASE_VERSION=0.1.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
-          fi
+          node <<'NODE'
+          const fs = require("node:fs");
+          const refType = process.env.GITHUB_REF_TYPE;
+          const refName = process.env.GITHUB_REF_NAME || "";
+          const tagVersion = refName.replace(/^v/, "");
+          const version = refType === "tag" && /^\d+\.\d+\.\d+([-.].+)?$/.test(tagVersion)
+            ? tagVersion
+            : JSON.parse(fs.readFileSync("package.json", "utf8")).version;
+          fs.appendFileSync(process.env.GITHUB_ENV, `RELEASE_VERSION=${version}\n`);
+          NODE
+
+      - name: Prepare release notes
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const cp = require("node:child_process");
+
+          function git(args) {
+            return cp.execFileSync("git", args, { encoding: "utf8" }).trim();
+          }
+
+          const version = process.env.RELEASE_VERSION;
+          const head = git(["rev-parse", "HEAD"]);
+          let base = "";
+          try {
+            base = git(["describe", "--tags", "--match", "codex-pet-desk-v*", "--abbrev=0", "HEAD^"]);
+          } catch {}
+
+          const range = base ? `${base}..HEAD` : "HEAD";
+          const raw = git(["log", range, "--pretty=format:%s%n%b%n---END---"]);
+          const entries = raw
+            .split("\n---END---")
+            .map((entry) => entry.trim())
+            .filter(Boolean)
+            .map((entry) => {
+              const [subject, ...bodyLines] = entry.split(/\r?\n/);
+              const changesIndex = bodyLines.findIndex((line) => /^Changes:\s*$/i.test(line.trim()));
+              if (changesIndex === -1) return `- ${subject}`;
+              const changes = bodyLines
+                .slice(changesIndex + 1)
+                .map((line) => line.trim())
+                .filter((line) => /^[-*]\s+/.test(line))
+                .map((line) => `  ${line.replace(/^[-*]\s+/, "- ")}`);
+              return [`- ${subject}`, ...changes].join("\n");
+            });
+
+          const notes = [
+            `Codex Pet Desk v${version}`,
+            "",
+            `Build commit: ${head}`,
+            "",
+            "Changes:",
+            entries.length ? entries.join("\n") : "- Automated full build."
+          ].join("\n");
+
+          fs.writeFileSync("RELEASE_NOTES.md", `${notes}\n`);
+          NODE
 
       - name: Prepare release assets
         run: |
@@ -205,7 +264,7 @@ jobs:
           const repo = process.env.GITHUB_REPOSITORY;
           const version = process.env.RELEASE_VERSION;
           const tag = `codex-pet-desk-v${version}`;
-          const notes = `Automated full build from ${process.env.GITHUB_SHA}.`;
+          const notes = fs.readFileSync("RELEASE_NOTES.md", "utf8").trim();
           const platforms = {};
 
           fs.rmSync(out, { recursive: true, force: true });
@@ -281,4 +340,4 @@ jobs:
           gh release create "$TAG" release-upload/* \
             --repo "$GITHUB_REPOSITORY" \
             --title "Codex Pet Desk v${RELEASE_VERSION}" \
-            --notes "Automated full build from ${GITHUB_SHA}."
+            --notes-file RELEASE_NOTES.md

@@ -257,6 +257,37 @@ fn take_hook_events() -> Result<Vec<HookEvent>, String> {
 }
 
 #[tauri::command]
+fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
+    open_or_focus_control_window(
+        &app,
+        SETTINGS_WINDOW_LABEL,
+        "Codex Pet Desk Settings",
+        "index.html?settings=1&page=settings",
+    )
+}
+
+#[tauri::command]
+fn open_pets_window(app: tauri::AppHandle) -> Result<(), String> {
+    open_or_focus_control_window(
+        &app,
+        PETS_WINDOW_LABEL,
+        "Codex Pet Desk Pets",
+        "index.html?settings=1&page=pets",
+    )
+}
+
+#[tauri::command]
+fn hide_pet_window(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
+        window.hide().map_err(|error| error.to_string())?;
+        update_tray_menu(&app, false).map_err(|error| error.to_string())?;
+        app.emit("pet-visibility-changed", false)
+            .map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
 fn codex_activity() -> Result<Option<HookEvent>, String> {
     let Some(session_file) = latest_codex_session_file()? else {
         return Ok(None);
@@ -1196,6 +1227,9 @@ pub fn run() {
             install_code_hooks,
             install_petdex_pet,
             list_codex_pets,
+            hide_pet_window,
+            open_pets_window,
+            open_settings_window,
             codex_activity,
             test_hook_bubble,
             take_hook_events
@@ -1263,14 +1297,14 @@ fn tray_icon_image() -> Image<'static> {
 }
 
 fn tray_menu(app_handle: &tauri::AppHandle, pet_visible: bool) -> tauri::menu::Menu<tauri::Wry> {
-    let visibility_label = if pet_visible { "Hide Pet" } else { "Show Pet" };
+    let visibility_label = if pet_visible { "隐藏" } else { "显示" };
 
     MenuBuilder::new(app_handle)
-        .text(MENU_OPEN_SETTINGS, "Settings")
-        .text(MENU_OPEN_PETS, "Pets")
+        .text(MENU_OPEN_SETTINGS, "设置")
+        .text(MENU_OPEN_PETS, "宠物")
         .text(MENU_TOGGLE_PET, visibility_label)
         .separator()
-        .text(MENU_QUIT, "Quit")
+        .text(MENU_QUIT, "退出")
         .build()
         .expect("failed to build tray menu")
 }

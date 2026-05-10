@@ -67,6 +67,10 @@ const localPetListEl = document.querySelector("#local-pet-list");
 const petdexSearchEl = document.querySelector("#petdex-search");
 const petdexStatusEl = document.querySelector("#petdex-status");
 const petdexListEl = document.querySelector("#petdex-list");
+const petContextMenuEl = document.querySelector("#pet-context-menu");
+const petMenuSettingsEl = document.querySelector("#pet-menu-settings");
+const petMenuPetsEl = document.querySelector("#pet-menu-pets");
+const petMenuHideEl = document.querySelector("#pet-menu-hide");
 const stateButtons = [...document.querySelectorAll(".state-button")];
 const tabButtons = [...document.querySelectorAll("[data-page].tab-button")];
 const pageEls = [...document.querySelectorAll(".settings-page")];
@@ -168,6 +172,10 @@ petPageButtons.forEach((button) => {
   button.addEventListener("click", () => setPetManagementPage(button.dataset.petPage));
 });
 
+petMenuSettingsEl?.addEventListener("click", () => runPetMenuAction("open_settings_window"));
+petMenuPetsEl?.addEventListener("click", () => runPetMenuAction("open_pets_window"));
+petMenuHideEl?.addEventListener("click", () => runPetMenuAction("hide_pet_window"));
+
 petEl.addEventListener("click", () => {
   if (!petEl.classList.contains("is-loaded")) return;
   if (currentState === "idle") setState("waving");
@@ -192,11 +200,26 @@ petEl.addEventListener("mouseleave", () => {
 
 document.addEventListener("mousedown", async (event) => {
   if (isSettingsWindow || event.button !== 0) return;
+  if (petContextMenuEl?.contains(event.target)) return;
+  hidePetContextMenu();
   event.preventDefault();
   await currentWindow?.startDragging();
 });
 
+document.addEventListener("contextmenu", (event) => {
+  if (isSettingsWindow) return;
+  event.preventDefault();
+  showPetContextMenu(event.clientX, event.clientY);
+});
+
+document.addEventListener("pointerdown", (event) => {
+  if (isSettingsWindow || petContextMenuEl?.hidden) return;
+  if (petContextMenuEl.contains(event.target)) return;
+  hidePetContextMenu();
+});
+
 document.addEventListener("wheel", (event) => {
+  hidePetContextMenu();
   if (!event.ctrlKey || isSettingsWindow) return;
   event.preventDefault();
   const direction = event.deltaY < 0 ? 1 : -1;
@@ -400,6 +423,30 @@ function setSettingsPage(page) {
       : "管理桌宠、更新、存储位置和 Codex 提醒。";
   }
   if (page === "pets") loadPetdexPets();
+}
+
+function showPetContextMenu(x, y) {
+  if (!petContextMenuEl) return;
+  petContextMenuEl.hidden = false;
+  const rect = petContextMenuEl.getBoundingClientRect();
+  const left = Math.max(8, Math.min(x, window.innerWidth - rect.width - 8));
+  const top = Math.max(8, Math.min(y, window.innerHeight - rect.height - 8));
+  petContextMenuEl.style.left = `${left}px`;
+  petContextMenuEl.style.top = `${top}px`;
+}
+
+function hidePetContextMenu() {
+  if (petContextMenuEl) petContextMenuEl.hidden = true;
+}
+
+async function runPetMenuAction(command) {
+  hidePetContextMenu();
+  if (!invokeCommand) return;
+  try {
+    await invokeCommand(command);
+  } catch (error) {
+    console.info(`${command} skipped:`, error);
+  }
 }
 
 function setPetManagementPage(page) {
