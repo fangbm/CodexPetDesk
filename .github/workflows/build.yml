@@ -181,12 +181,6 @@ jobs:
     needs: build
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
-          fetch-depth: 0
-
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
@@ -200,38 +194,6 @@ jobs:
             echo "RELEASE_VERSION=0.1.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
           fi
 
-      - name: Generate release notes
-        shell: bash
-        run: |
-          TAG="codex-pet-desk-v${RELEASE_VERSION}"
-          git fetch --tags --force
-          PREVIOUS_TAG="$(git tag --merged HEAD --sort=-v:refname --list 'codex-pet-desk-v*' | grep -v "^${TAG}$" | head -n 1 || true)"
-
-          {
-            echo "## Codex Pet Desk v${RELEASE_VERSION}"
-            echo
-            if [ -n "$PREVIOUS_TAG" ]; then
-              echo "Changes since ${PREVIOUS_TAG}:"
-              RANGE="${PREVIOUS_TAG}..HEAD"
-            else
-              echo "Changes in this release:"
-              RANGE="HEAD"
-            fi
-            echo
-
-            if git log --no-merges --pretty=format:'- %s (%h)' "$RANGE" | grep -q .; then
-              git log --no-merges --pretty=format:'- %s (%h)' "$RANGE"
-              echo
-            else
-              echo "- Full build from ${GITHUB_SHA}."
-            fi
-
-            echo
-            echo "Build commit: ${GITHUB_SHA}"
-          } > RELEASE_NOTES.md
-
-          cat RELEASE_NOTES.md
-
       - name: Prepare release assets
         run: |
           node <<'NODE'
@@ -243,9 +205,7 @@ jobs:
           const repo = process.env.GITHUB_REPOSITORY;
           const version = process.env.RELEASE_VERSION;
           const tag = `codex-pet-desk-v${version}`;
-          const notes = fs.existsSync("RELEASE_NOTES.md")
-            ? fs.readFileSync("RELEASE_NOTES.md", "utf8").trim()
-            : `Automated full build from ${process.env.GITHUB_SHA}.`;
+          const notes = `Automated full build from ${process.env.GITHUB_SHA}.`;
           const platforms = {};
 
           fs.rmSync(out, { recursive: true, force: true });
@@ -321,4 +281,4 @@ jobs:
           gh release create "$TAG" release-upload/* \
             --repo "$GITHUB_REPOSITORY" \
             --title "Codex Pet Desk v${RELEASE_VERSION}" \
-            --notes-file RELEASE_NOTES.md
+            --notes "Automated full build from ${GITHUB_SHA}."

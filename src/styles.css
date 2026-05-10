@@ -165,42 +165,6 @@ input {
   filter: none;
 }
 
-.pet-context-menu {
-  position: fixed;
-  z-index: 20;
-  display: grid;
-  min-width: 140px;
-  padding: 6px;
-  border: 1px solid rgb(0 0 0 / 0.08);
-  border-radius: 8px;
-  background: rgb(255 255 255 / 0.96);
-  box-shadow: 0 14px 34px rgb(15 23 42 / 0.2);
-  backdrop-filter: blur(14px);
-}
-
-.pet-context-menu[hidden] {
-  display: none;
-}
-
-.pet-context-menu button {
-  display: grid;
-  place-items: center;
-  height: 34px;
-  padding: 0 14px;
-  border: 0;
-  border-radius: 6px;
-  color: #1f2937;
-  background: transparent;
-  cursor: pointer;
-  font-size: 13px;
-  text-align: center;
-}
-
-.pet-context-menu button:hover {
-  color: #0f172a;
-  background: #eef3ff;
-}
-
 .panel {
   display: grid;
   gap: 12px;
@@ -876,20 +840,6 @@ body.is-dragging .panel {
   min-height: 0;
 }
 
-.settings-card--hooks {
-  align-self: stretch;
-  overflow: hidden;
-}
-
-.settings-card--hooks .toggle-row,
-.settings-card--hooks .file-actions {
-  min-width: 0;
-}
-
-.settings-card--hooks .file-button {
-  width: 100%;
-}
-
 .shell--settings .section-title {
   color: #111827;
   font-size: 15px;
@@ -1040,21 +990,6 @@ body.is-dragging .panel {
 .shell--settings .status-text,
 .shell--settings .empty-state {
   color: #667085;
-}
-
-@media (max-width: 760px) {
-  .settings-page[data-page="settings"].is-active {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .settings-page[data-page="settings"] .settings-section:first-child,
-  .settings-page[data-page="settings"] .settings-section:last-child {
-    grid-column: auto;
-  }
-
-  .shell--settings .file-actions {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 @media (max-width: 640px) {

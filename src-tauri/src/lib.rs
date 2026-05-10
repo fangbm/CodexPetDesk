@@ -303,38 +303,6 @@ fn install_petdex_pet(request: PetdexInstallRequest) -> Result<NativePet, String
     read_pet_package(&pet_dir, &pet_dir.join("pet.json"))
 }
 
-#[tauri::command]
-fn open_settings_window(app_handle: tauri::AppHandle) -> Result<(), String> {
-    open_or_focus_control_window(
-        &app_handle,
-        SETTINGS_WINDOW_LABEL,
-        "Codex Pet Desk Settings",
-        "index.html?settings=1&page=settings",
-    )
-}
-
-#[tauri::command]
-fn open_pets_window(app_handle: tauri::AppHandle) -> Result<(), String> {
-    open_or_focus_control_window(
-        &app_handle,
-        PETS_WINDOW_LABEL,
-        "Codex Pet Desk Pets",
-        "index.html?settings=1&page=pets",
-    )
-}
-
-#[tauri::command]
-fn hide_pet_window(app_handle: tauri::AppHandle) -> Result<(), String> {
-    if let Some(window) = app_handle.get_webview_window(MAIN_WINDOW_LABEL) {
-        window.hide().map_err(|error| error.to_string())?;
-        update_tray_menu(&app_handle, false).map_err(|error| error.to_string())?;
-        app_handle
-            .emit("pet-visibility-changed", false)
-            .map_err(|error| error.to_string())?;
-    }
-    Ok(())
-}
-
 fn read_pet_package(pet_dir: &PathBuf, manifest_path: &PathBuf) -> Result<NativePet, String> {
     let manifest_text = fs::read_to_string(manifest_path).map_err(|error| error.to_string())?;
     let manifest: PetManifest =
@@ -1224,13 +1192,10 @@ pub fn run() {
             default_builtin_pet,
             default_pet_storage_dir,
             fetch_petdex_pets,
-            hide_pet_window,
             hook_status,
             install_code_hooks,
             install_petdex_pet,
             list_codex_pets,
-            open_pets_window,
-            open_settings_window,
             codex_activity,
             test_hook_bubble,
             take_hook_events
@@ -1298,14 +1263,14 @@ fn tray_icon_image() -> Image<'static> {
 }
 
 fn tray_menu(app_handle: &tauri::AppHandle, pet_visible: bool) -> tauri::menu::Menu<tauri::Wry> {
-    let visibility_label = if pet_visible { "隐藏" } else { "显示" };
+    let visibility_label = if pet_visible { "Hide Pet" } else { "Show Pet" };
 
     MenuBuilder::new(app_handle)
-        .text(MENU_OPEN_SETTINGS, "设置")
-        .text(MENU_OPEN_PETS, "宠物")
+        .text(MENU_OPEN_SETTINGS, "Settings")
+        .text(MENU_OPEN_PETS, "Pets")
         .text(MENU_TOGGLE_PET, visibility_label)
         .separator()
-        .text(MENU_QUIT, "退出")
+        .text(MENU_QUIT, "Quit")
         .build()
         .expect("failed to build tray menu")
 }

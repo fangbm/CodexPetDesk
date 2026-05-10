@@ -53,7 +53,6 @@ const appVersionEl = document.querySelector("#app-version");
 const settingsTitleEl = document.querySelector("#settings-title");
 const settingsSubtitleEl = document.querySelector("#settings-subtitle");
 const speechBubbleEl = document.querySelector("#speech-bubble");
-const petContextMenuEl = document.querySelector("#pet-context-menu");
 const startupUpdateCheckEl = document.querySelector("#startup-update-check");
 const checkUpdateEl = document.querySelector("#check-update");
 const updateStatusEl = document.querySelector("#update-status");
@@ -193,28 +192,9 @@ petEl.addEventListener("mouseleave", () => {
 
 document.addEventListener("mousedown", async (event) => {
   if (isSettingsWindow || event.button !== 0) return;
-  if (event.target.closest?.("#pet-context-menu")) return;
   event.preventDefault();
   await currentWindow?.startDragging();
 });
-
-document.addEventListener("contextmenu", (event) => {
-  if (isSettingsWindow) return;
-  event.preventDefault();
-  showPetContextMenu(event.clientX, event.clientY);
-});
-
-document.addEventListener("click", (event) => {
-  const actionButton = event.target.closest?.("[data-context-action]");
-  if (actionButton) {
-    event.preventDefault();
-    void handlePetContextAction(actionButton.dataset.contextAction);
-    return;
-  }
-  hidePetContextMenu();
-});
-
-window.addEventListener("blur", hidePetContextMenu);
 
 document.addEventListener("wheel", (event) => {
   if (!event.ctrlKey || isSettingsWindow) return;
@@ -426,35 +406,6 @@ function setPetManagementPage(page) {
   petPageButtons.forEach((button) => button.classList.toggle("is-active", button.dataset.petPage === page));
   petPageEls.forEach((pageEl) => pageEl.classList.toggle("is-active", pageEl.dataset.petPage === page));
   if (page === "petdex") loadPetdexPets();
-}
-
-function showPetContextMenu(x, y) {
-  if (!petContextMenuEl) return;
-
-  petContextMenuEl.hidden = false;
-  const { width, height } = petContextMenuEl.getBoundingClientRect();
-  const left = Math.max(6, Math.min(x, window.innerWidth - width - 6));
-  const top = Math.max(6, Math.min(y, window.innerHeight - height - 6));
-  petContextMenuEl.style.left = `${left}px`;
-  petContextMenuEl.style.top = `${top}px`;
-}
-
-function hidePetContextMenu() {
-  if (!petContextMenuEl) return;
-  petContextMenuEl.hidden = true;
-}
-
-async function handlePetContextAction(action) {
-  hidePetContextMenu();
-  if (!invokeCommand) return;
-
-  if (action === "settings") {
-    await invokeCommand("open_settings_window");
-  } else if (action === "pets") {
-    await invokeCommand("open_pets_window");
-  } else if (action === "hide") {
-    await invokeCommand("hide_pet_window");
-  }
 }
 
 function renderPetStorageDir() {
