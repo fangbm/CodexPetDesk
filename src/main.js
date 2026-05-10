@@ -105,6 +105,7 @@ let lastCodexActivityKey = "";
 
 appEl.classList.toggle("shell--settings", isSettingsWindow);
 appEl.classList.toggle("shell--pet", !isSettingsWindow);
+if (isSettingsWindow) appEl.removeAttribute("data-tauri-drag-region");
 setSettingsPage(initialSettingsPage);
 applyScale();
 setState("idle");

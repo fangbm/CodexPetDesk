@@ -38,6 +38,25 @@ input {
   padding: 0;
 }
 
+.settings-boot .shell {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  color: #151923;
+  background: #f5f7fb;
+}
+
+.settings-boot .pet-stage {
+  display: none;
+}
+
+.settings-boot .shell .panel {
+  display: grid;
+}
+
 .shell--pet .pet-stage {
   overflow: visible;
 }
