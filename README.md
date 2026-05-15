@@ -93,3 +93,55 @@ The widget also registers a Web Component:
 
 Supported overlay behavior includes Codex pet manifest loading, sprite animation
 states, hover jumping, drag movement, Ctrl+wheel scaling, and speech bubbles.
+
+### Cloudflare R2 Hosting
+
+Upload the generated widget bundle and pet files to R2:
+
+```text
+codex-pet/
+├── codex-pet-widget.js
+└── pets/
+    └── hachiroku/
+        ├── pet.json
+        └── spritesheet.webp
+```
+
+Use the classic bundle from `dist-widget/codex-pet-widget.js` with a normal
+script tag:
+
+```html
+<script src="https://pet.api.fangbm.com/codex-pet/codex-pet-widget.js"></script>
+<script>
+  CodexPet.mount({
+    pet: "https://pet.api.fangbm.com/codex-pet/pets/hachiroku/pet.json"
+  });
+</script>
+```
+
+If you upload the ESM bundle or source file instead, load it as a module:
+
+```html
+<script type="module">
+  import { mount } from "https://pet.api.fangbm.com/codex-pet/codex-pet-widget.js";
+
+  mount({
+    pet: "https://pet.api.fangbm.com/codex-pet/pets/hachiroku/pet.json"
+  });
+</script>
+```
+
+When the page is not hosted on the same `pet.api.fangbm.com` origin, configure
+R2 CORS for the bucket:
+
+```json
+[
+  {
+    "AllowedOrigins": ["*"],
+    "AllowedMethods": ["GET", "HEAD"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": [],
+    "MaxAgeSeconds": 3600
+  }
+]
+```

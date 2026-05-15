@@ -71,10 +71,11 @@
       </div>
     </main>
 
-    <script src="../dist-widget/codex-pet-widget.js"></script>
-    <script>
-      const pet = CodexPet.mount({
-        pet: "/pets/hachiroku/pet.json",
+    <script type="module">
+      import { mount } from "https://pet.api.fangbm.com/codex-pet/codex-pet-widget.js";
+
+      const pet = mount({
+        pet: "https://pet.api.fangbm.com/codex-pet/pets/hachiroku/pet.json",
         position: "bottom-right",
         scale: 0.85
       });
