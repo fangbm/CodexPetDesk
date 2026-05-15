@@ -174,10 +174,52 @@ jobs:
           if-no-files-found: error
           path: src-tauri/target/release/bundle/**/*
 
+  build-widget:
+    name: Build web widget
+    runs-on: ubuntu-22.04
+    needs: validate-release-secrets
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build web widget
+        run: npm run build:widget
+
+      - name: Package web widget
+        run: |
+          mkdir -p release-widget/codex-pet-widget
+          cp -R dist-widget/* release-widget/codex-pet-widget/
+          cp -R public/pets release-widget/codex-pet-widget/pets
+          tar -czf codex-pet-widget.tar.gz -C release-widget codex-pet-widget
+          (cd release-widget && zip -r ../codex-pet-widget.zip codex-pet-widget)
+
+      - name: Upload web widget artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: codex-pet-widget
+          if-no-files-found: error
+          path: |
+            codex-pet-widget.tar.gz
+            codex-pet-widget.zip
+
   publish-release:
     name: Publish release
     runs-on: ubuntu-22.04
-    needs: build
+    needs:
+      - build
+      - build-widget
 
     steps:
       - name: Checkout
@@ -305,7 +347,9 @@ jobs:
 
           function isReleaseAsset(file) {
             const name = path.basename(file);
-            return /\.(exe|msi|dmg|AppImage|deb|rpm)$/i.test(name) || /\.app\.tar\.gz$/i.test(name);
+            return /\.(exe|msi|dmg|AppImage|deb|rpm)$/i.test(name)
+              || /\.app\.tar\.gz$/i.test(name)
+              || /^codex-pet-widget\.(zip|tar\.gz)$/i.test(name);
           }
 
           const files = walk(root);

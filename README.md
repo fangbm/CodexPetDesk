@@ -41,6 +41,15 @@ Build release bundles:
 npm run tauri:build
 ```
 
+Build the embeddable web widget:
+
+```bash
+npm run build:widget
+```
+
+The widget build writes `dist-widget/codex-pet-widget.js` for classic script tags and
+`dist-widget/codex-pet-widget.es.js` for ESM imports.
+
 ## Load A Pet
 
 Use `Open pet` and select both `pet.json` and its referenced spritesheet, or use `Open folder` and choose the whole pet package folder. Dragging both files onto the window also works.
@@ -55,3 +64,32 @@ The expected manifest shape is:
   "spritesheetPath": "spritesheet.webp"
 }
 ```
+
+## Web Widget
+
+Codex Pet Desk can also render a Codex pet as a website overlay. Build the widget,
+copy the generated file to your site, and mount it from any page:
+
+```html
+<script src="/codex-pet-widget.js"></script>
+<script>
+  const pet = CodexPet.mount({
+    pet: "/pets/hachiroku/pet.json",
+    position: "bottom-right",
+    scale: 0.85
+  });
+
+  pet.say("任务已经完成。", { title: "Codex", state: "waving" });
+  pet.setState("running");
+</script>
+```
+
+The widget also registers a Web Component:
+
+```html
+<codex-pet src="/pets/hachiroku/pet.json" position="bottom-right" scale="1"></codex-pet>
+<script type="module" src="/codex-pet-widget.es.js"></script>
+```
+
+Supported overlay behavior includes Codex pet manifest loading, sprite animation
+states, hover jumping, drag movement, Ctrl+wheel scaling, and speech bubbles.

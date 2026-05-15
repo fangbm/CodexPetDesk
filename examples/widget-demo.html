@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Codex Pet Widget Demo</title>
+    <style>
+      body {
+        min-height: 100vh;
+        margin: 0;
+        color: #172033;
+        background: #f6f8fc;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      main {
+        display: grid;
+        gap: 18px;
+        width: min(720px, calc(100vw - 40px));
+        margin: 56px auto;
+      }
+
+      h1,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 32px;
+        line-height: 1.1;
+      }
+
+      p {
+        color: #5c677a;
+        line-height: 1.6;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      button {
+        height: 38px;
+        padding: 0 14px;
+        border: 1px solid #d8dfeb;
+        border-radius: 8px;
+        color: #172033;
+        background: #fff;
+        cursor: pointer;
+        font: inherit;
+        font-weight: 700;
+      }
+
+      button:hover {
+        border-color: #aebbd0;
+        background: #f9fbff;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Codex Pet Widget</h1>
+      <p>这个页面演示如何把 Codex pet 叠加渲染到普通网页上。桌宠支持拖动、悬停动画、Ctrl+滚轮缩放和气泡提示。</p>
+      <div class="actions">
+        <button id="say" type="button">显示气泡</button>
+        <button id="running" type="button">Running</button>
+        <button id="waiting" type="button">Waiting</button>
+        <button id="idle" type="button">Idle</button>
+      </div>
+    </main>
+
+    <script src="../dist-widget/codex-pet-widget.js"></script>
+    <script>
+      const pet = CodexPet.mount({
+        pet: "/pets/hachiroku/pet.json",
+        position: "bottom-right",
+        scale: 0.85
+      });
+
+      document.querySelector("#say").addEventListener("click", () => {
+        pet.say("网页任务已经完成。", { title: "测试气泡", state: "waving" });
+      });
+      document.querySelector("#running").addEventListener("click", () => pet.setState("running"));
+      document.querySelector("#waiting").addEventListener("click", () => pet.setState("waiting"));
+      document.querySelector("#idle").addEventListener("click", () => pet.setState("idle"));
+    </script>
+  </body>
+</html>

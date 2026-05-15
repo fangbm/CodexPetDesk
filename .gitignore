@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-widget/
 src-tauri/target/
 src-tauri/gen/
 .tauri-keys/
