@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   clearScreen: false,
+  publicDir: false,
   build: {
     outDir: "dist-widget",
     emptyOutDir: true,

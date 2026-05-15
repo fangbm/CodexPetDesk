@@ -48,7 +48,8 @@ npm run build:widget
 ```
 
 The widget build writes `dist-widget/codex-pet-widget.js` for classic script tags and
-`dist-widget/codex-pet-widget.es.js` for ESM imports.
+`dist-widget/codex-pet-widget.es.js` for ESM imports. Widget release archives
+only contain these JavaScript bundles; pet files are hosted separately.
 
 ## Load A Pet
 
@@ -99,7 +100,9 @@ rendered size fixed across viewport widths.
 
 ### Cloudflare R2 Hosting
 
-Upload the generated widget bundle and pet files to R2:
+Upload the generated widget bundle and pet files to R2. The widget release
+archive contains only the JavaScript files, so copy pet assets from your pet
+source directory separately:
 
 ```text
 codex-pet/

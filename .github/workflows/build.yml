@@ -201,8 +201,7 @@ jobs:
       - name: Package web widget
         run: |
           mkdir -p release-widget/codex-pet-widget
-          cp -R dist-widget/* release-widget/codex-pet-widget/
-          cp -R public/pets release-widget/codex-pet-widget/pets
+          cp dist-widget/codex-pet-widget*.js release-widget/codex-pet-widget/
           tar -czf codex-pet-widget.tar.gz -C release-widget codex-pet-widget
           (cd release-widget && zip -r ../codex-pet-widget.zip codex-pet-widget)
 
