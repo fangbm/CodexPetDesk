@@ -40,6 +40,7 @@ input {
 
 .shell--pet .pet-stage {
   overflow: visible;
+  touch-action: none;
 }
 
 .shell--settings {
@@ -171,6 +172,7 @@ input {
   background-repeat: no-repeat;
   filter: drop-shadow(0 12px 12px rgb(0 0 0 / 0.26));
   cursor: grab;
+  touch-action: none;
   -webkit-user-drag: none;
   transition: transform 160ms ease, filter 160ms ease;
 }

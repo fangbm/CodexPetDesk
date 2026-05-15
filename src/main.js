@@ -105,6 +105,7 @@ let hookPollTimer = 0;
 let windowLayoutMoveTimer = 0;
 let currentPetWindowLayout = null;
 let lastCodexActivityKey = "";
+let touchPinch = null;
 
 appEl.classList.toggle("shell--settings", isSettingsWindow);
 appEl.classList.toggle("shell--pet", !isSettingsWindow);
@@ -224,6 +225,11 @@ document.addEventListener("wheel", (event) => {
   const direction = event.deltaY < 0 ? 1 : -1;
   updateScale(scale + direction * WHEEL_SCALE_STEP);
 }, { passive: false });
+
+document.addEventListener("touchstart", handlePetTouchStart, { passive: false });
+document.addEventListener("touchmove", handlePetTouchMove, { passive: false });
+document.addEventListener("touchend", handlePetTouchEnd);
+document.addEventListener("touchcancel", handlePetTouchEnd);
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") panelEl.classList.toggle("is-hidden");
@@ -1013,6 +1019,31 @@ function updateScale(nextScale, broadcast = true) {
   applyScale();
   renderFrame();
   if (broadcast) emitEvent?.("pet-scale-changed", scale);
+}
+
+function handlePetTouchStart(event) {
+  if (isSettingsWindow || event.touches.length !== 2) return;
+  event.preventDefault();
+  hidePetContextMenu();
+  const distance = touchDistance(event.touches[0], event.touches[1]);
+  if (distance <= 0) return;
+  touchPinch = { distance, scale };
+}
+
+function handlePetTouchMove(event) {
+  if (isSettingsWindow || !touchPinch || event.touches.length < 2) return;
+  event.preventDefault();
+  const distance = touchDistance(event.touches[0], event.touches[1]);
+  if (distance <= 0) return;
+  updateScale(touchPinch.scale * (distance / touchPinch.distance));
+}
+
+function handlePetTouchEnd(event) {
+  if (event.touches.length < 2) touchPinch = null;
+}
+
+function touchDistance(first, second) {
+  return Math.hypot(first.clientX - second.clientX, first.clientY - second.clientY);
 }
 
 function resizePetWindow(options = {}) {

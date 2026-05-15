@@ -92,7 +92,10 @@ The widget also registers a Web Component:
 ```
 
 Supported overlay behavior includes Codex pet manifest loading, sprite animation
-states, hover jumping, drag movement, Ctrl+wheel scaling, and speech bubbles.
+states, hover jumping, drag movement, Ctrl+wheel scaling, touch pinch scaling,
+mobile auto-scaling, and speech bubbles. Set `autoScale: false` in
+`CodexPet.mount(...)` or `auto-scale="false"` on `<codex-pet>` to keep the
+rendered size fixed across viewport widths.
 
 ### Cloudflare R2 Hosting
 
