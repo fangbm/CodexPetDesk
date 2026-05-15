@@ -205,6 +205,92 @@ jobs:
           tar -czf codex-pet-widget.tar.gz -C release-widget codex-pet-widget
           (cd release-widget && zip -r ../codex-pet-widget.zip codex-pet-widget)
 
+      - name: Upload widget files to Cloudflare R2
+        shell: bash
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_PREFIX: ${{ vars.R2_PREFIX }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_EC2_METADATA_DISABLED: true
+        run: |
+          missing=0
+          for name in R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_BUCKET; do
+            if [ -z "${!name}" ]; then
+              echo "::notice::Skipping R2 upload because ${name} is not configured."
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 0
+          fi
+
+          if ! command -v aws >/dev/null 2>&1; then
+            python3 -m pip install --user awscli
+            export PATH="$HOME/.local/bin:$PATH"
+          fi
+
+          endpoint="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          prefix="${R2_PREFIX:-codex-pet}"
+          prefix="${prefix#/}"
+          prefix="${prefix%/}"
+
+          object_key() {
+            if [ -n "$prefix" ]; then
+              printf '%s/%s' "$prefix" "$1"
+            else
+              printf '%s' "$1"
+            fi
+          }
+
+          upload_file() {
+            local source="$1"
+            local key="$2"
+            local content_type="$3"
+            local cache_control="$4"
+            aws s3 cp "$source" "s3://${R2_BUCKET}/${key}" \
+              --endpoint-url "$endpoint" \
+              --content-type "$content_type" \
+              --cache-control "$cache_control"
+          }
+
+          upload_file "dist-widget/codex-pet-widget.js" "$(object_key "codex-pet-widget.js")" "text/javascript; charset=utf-8" "public,max-age=300"
+          upload_file "dist-widget/codex-pet-widget.es.js" "$(object_key "codex-pet-widget.es.js")" "text/javascript; charset=utf-8" "public,max-age=300"
+
+          if [ -d "public/pets" ]; then
+            while IFS= read -r -d '' file; do
+              rel="${file#public/pets/}"
+              lower="${file,,}"
+              case "$lower" in
+                *.json)
+                  content_type="application/json; charset=utf-8"
+                  cache_control="public,max-age=300"
+                  ;;
+                *.webp)
+                  content_type="image/webp"
+                  cache_control="public,max-age=31536000,immutable"
+                  ;;
+                *.png)
+                  content_type="image/png"
+                  cache_control="public,max-age=31536000,immutable"
+                  ;;
+                *.gif)
+                  content_type="image/gif"
+                  cache_control="public,max-age=31536000,immutable"
+                  ;;
+                *)
+                  content_type="application/octet-stream"
+                  cache_control="public,max-age=14400"
+                  ;;
+              esac
+              upload_file "$file" "$(object_key "pets/${rel}")" "$content_type" "$cache_control"
+            done < <(find public/pets -type f -print0)
+          fi
+
       - name: Upload web widget artifact
         uses: actions/upload-artifact@v4
         with:

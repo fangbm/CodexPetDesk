@@ -152,6 +152,31 @@ R2 CORS for the bucket:
 ]
 ```
 
+### Automatic R2 Upload
+
+The `Full Build` workflow can upload the latest widget files to R2 after
+`npm run build:widget`. Add these GitHub repository secrets:
+
+```text
+R2_ACCOUNT_ID
+R2_ACCESS_KEY_ID
+R2_SECRET_ACCESS_KEY
+R2_BUCKET
+```
+
+Optionally add a repository variable named `R2_PREFIX`; it defaults to
+`codex-pet`. The workflow uploads:
+
+```text
+codex-pet/codex-pet-widget.js
+codex-pet/codex-pet-widget.es.js
+codex-pet/pets/<pet-name>/...
+```
+
+The upload overwrites matching files but does not delete extra files already in
+R2. If any required R2 secret is missing, the release build continues and prints
+a notice instead of failing.
+
 ## License
 
 Code is licensed under the MIT License. Bundled pet artwork and sprites are
