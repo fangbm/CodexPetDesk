@@ -161,11 +161,11 @@ The `Full Build` workflow can upload the latest widget files to R2 after
 R2_ACCOUNT_ID
 R2_ACCESS_KEY_ID
 R2_SECRET_ACCESS_KEY
-R2_BUCKET
 ```
 
-Optionally add a repository variable named `R2_PREFIX`; it defaults to
-`codex-pet`. The workflow uploads:
+The workflow defaults to bucket `codex-pet-desk` and prefix `codex-pet`.
+Optionally add repository variables named `R2_BUCKET` or `R2_PREFIX` to
+override them. With the defaults, it uploads:
 
 ```text
 codex-pet/codex-pet-widget.js
