@@ -114,7 +114,9 @@ jobs:
           cache-bin: false
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: |
+          npm ci --include=optional
+          npm install --include=optional --package-lock=false
 
       - name: Check JavaScript syntax
         run: node --check src/main.js

@@ -138,7 +138,9 @@ jobs:
           cache-bin: false
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: |
+          npm ci --include=optional
+          npm install --include=optional --package-lock=false
 
       - name: Set release version
         shell: bash
@@ -193,7 +195,9 @@ jobs:
           cache: npm
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: |
+          npm ci --include=optional
+          npm install --include=optional --package-lock=false
 
       - name: Build web widget
         run: npm run build:widget
