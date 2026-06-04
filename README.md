@@ -71,6 +71,8 @@ The expected manifest shape is:
 Codex Pet Desk can also render a Codex pet as a website overlay. Build the widget,
 copy the generated file to your site, and mount it from any page:
 
+For the full browser API, see [docs/widget-api.md](docs/widget-api.md).
+
 ```html
 <script src="/codex-pet-widget.js"></script>
 <script>
