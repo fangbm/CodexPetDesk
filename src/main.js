@@ -25,15 +25,15 @@ const isSettingsWindow = searchParams.has("settings");
 const initialSettingsPage = searchParams.get("page") === "pets" ? "pets" : "settings";
 
 const STATES = {
-  idle: { row: 0, durations: [280, 110, 110, 140, 140, 320] },
-  "running-right": { row: 1, durations: [120, 120, 120, 120, 120, 120, 120, 220] },
-  "running-left": { row: 2, durations: [120, 120, 120, 120, 120, 120, 120, 220] },
-  waving: { row: 3, durations: [140, 140, 140, 280] },
-  jumping: { row: 4, durations: [140, 140, 140, 140, 280] },
-  failed: { row: 5, durations: [140, 140, 140, 140, 140, 140, 140, 240] },
-  waiting: { row: 6, durations: [150, 150, 150, 150, 150, 260] },
-  running: { row: 7, durations: [120, 120, 120, 120, 120, 220] },
-  review: { row: 8, durations: [150, 150, 150, 150, 150, 280] }
+  idle: { row: 0, durations: [420, 165, 165, 210, 210, 480] },
+  "running-right": { row: 1, durations: [180, 180, 180, 180, 180, 180, 180, 330] },
+  "running-left": { row: 2, durations: [180, 180, 180, 180, 180, 180, 180, 330] },
+  waving: { row: 3, durations: [210, 210, 210, 420] },
+  jumping: { row: 4, durations: [210, 210, 210, 210, 420] },
+  failed: { row: 5, durations: [210, 210, 210, 210, 210, 210, 210, 360] },
+  waiting: { row: 6, durations: [225, 225, 225, 225, 225, 390] },
+  running: { row: 7, durations: [180, 180, 180, 180, 180, 330] },
+  review: { row: 8, durations: [225, 225, 225, 225, 225, 420] }
 };
 
 const SAMPLE_PET = {
