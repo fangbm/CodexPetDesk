@@ -1,5 +1,7 @@
 # Codex Pet Widget API
 
+[English](widget-api.md) | [中文](widget-api.zh-CN.md)
+
 Codex Pet Widget renders a Codex-compatible pet on any webpage. It is packaged
 as a classic browser bundle and an ESM bundle.
 

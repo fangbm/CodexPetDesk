@@ -1,5 +1,7 @@
 # Codex Pet Desk
 
+[English](README.md) | [中文](README.zh-CN.md)
+
 A small cross-platform desktop pet shell for Codex-compatible pet packages.
 
 Codex pet packages use this layout:

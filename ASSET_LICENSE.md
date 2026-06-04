@@ -1,5 +1,7 @@
 # Asset License Notice
 
+[English](ASSET_LICENSE.md) | [中文](ASSET_LICENSE.zh-CN.md)
+
 The source code in this repository is licensed under the MIT License. See
 `LICENSE` for the full code license.
 
