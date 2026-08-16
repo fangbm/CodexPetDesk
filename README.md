@@ -185,3 +185,4 @@ a notice instead of failing.
 
 Code is licensed under the MIT License. Bundled pet artwork and sprites are
 covered separately by [ASSET_LICENSE.md](ASSET_LICENSE.md).
+ 
